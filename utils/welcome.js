@@ -23,12 +23,12 @@ async function sendWelcomeMessage(member) {
         const background = await Canvas.loadImage('https://iili.io/nqNN92a.png');
         ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
 
-        // 3. Koordynaty awatara wyliczone z Canvy (środek koła X: 600, Y: 153)
+        // 3. Koordynaty awatara (środek koła X: 600, Y: 153)
         const centerX = 600;
         const centerY = 153;
-        const avatarRadius = 104; // Promień dopasowany do otworu pod awatar
+        const avatarRadius = 104;
 
-        // 4. Rysowanie delikatnego tła/obramówki pod awatarem (tworzy obwódkę)
+        // 4. Obramowanie pod awatarem
         ctx.save();
         ctx.beginPath();
         ctx.arc(centerX, centerY, avatarRadius + 6, 0, Math.PI * 2, true);
@@ -51,16 +51,11 @@ async function sendWelcomeMessage(member) {
         ctx.drawImage(avatar, centerX - avatarRadius, centerY - avatarRadius, avatarRadius * 2, avatarRadius * 2);
         ctx.restore();
 
-        // 6. Rysowanie nazwy użytkownika (Pogrubiony Poppins)
+        // 6. Rysowanie nazwy użytkownika (wyśrodkowana, biała, odpowiednio duża i pogrubiona Poppins)
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 42px "Poppins", sans-serif';
+        ctx.font = 'bold 46px "Poppins", sans-serif';
         ctx.fillText(username, 606, 355);
-
-        // 7. Rysowanie statycznego napisu "Polskie Drogi Roleplay" (Pogrubiony Poppins)
-        ctx.fillStyle = '#d0d0d0';
-        ctx.font = 'bold 22px "Poppins", sans-serif';
-        ctx.fillText('Polskie Drogi Roleplay', 606, 395);
 
         // Generowanie załącznika i wysyłka
         const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome-banner.png' });
