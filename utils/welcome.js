@@ -1,5 +1,5 @@
 const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
-const Welcome = require('discord-welcome-card');
+const { drawCard } = require('discord-welcome-card');
 
 async function sendWelcomeMessage(member) {
     try {
@@ -15,14 +15,26 @@ async function sendWelcomeMessage(member) {
         const username = member.user.username;
         const serverName = member.guild.name;
 
-        const image = await Welcome.drawCard({
+        // Generowanie karty z awatarem na środku i tekstem pod spodem
+        const image = await drawCard({
             theme: 'dark',
-            avatar: avatarURL,
-            name: username,
-            title: serverName,
-            subtitle: `Jesteś naszym ${memberCount} członkiem`,
-            background: 'https://images.unsplash.com/photo-1518684079-3c830dcef090?q=80&w=1000&auto=format&fit=crop',
-            rounded: true
+            text: {
+                title: serverName,
+                text: username,
+                subtitle: `Jesteś naszym ${memberCount} członkiem`,
+                color: '#ffffff'
+            },
+            avatar: {
+                image: avatarURL,
+                rounded: true,
+                outlineWidth: 5,
+                outlineColor: '#ffffff'
+            },
+            card: {
+                background: 'https://images.unsplash.com/photo-1518684079-3c830dcef090?q=80&w=1000&auto=format&fit=crop',
+                blur: 1,
+                rounded: true
+            }
         });
 
         const attachment = new AttachmentBuilder(image, { name: 'welcome-banner.png' });
