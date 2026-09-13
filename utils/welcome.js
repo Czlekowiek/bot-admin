@@ -1,5 +1,5 @@
 const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
-const { drawCard } = require('discord-welcome-card');
+const Welcome = require('discord-welcome-card');
 
 async function sendWelcomeMessage(member) {
     try {
@@ -15,8 +15,7 @@ async function sendWelcomeMessage(member) {
         const username = member.user.username;
         const serverName = member.guild.name;
 
-        // Generowanie karty powitalnej w formie banera
-        const image = await drawCard({
+        const image = await Welcome.drawCard({
             theme: 'dark',
             avatar: avatarURL,
             name: username,
