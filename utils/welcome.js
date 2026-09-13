@@ -3,55 +3,70 @@ const Canvas = require('canvas');
 
 async function sendWelcomeMessage(member) {
     try {
-        const CHANNEL_ID = '1542121319263641682';
+        const WELCOME_CHANNEL_ID = '1542121319263641682';
 
-        const channel = await member.guild.channels.fetch(CHANNEL_ID).catch(() => null);
+        const channel = await member.guild.channels
+            .fetch(WELCOME_CHANNEL_ID)
+            .catch(() => null);
 
         if (!channel) {
-            console.error('❌ Nie znaleziono kanału powitalnego.');
+            console.error('Nie znaleziono kanału powitalnego.');
             return;
         }
 
+        const memberCount = member.guild.memberCount;
         const username = member.user.username;
         const serverName = member.guild.name;
-        const memberCount = member.guild.memberCount;
 
-        // ==========================================
-        // CANVAS
-        // ==========================================
+        const createdAt = member.user.createdAt;
+        const formattedDate = createdAt
+            .toISOString()
+            .replace(/T/, ' ')
+            .replace(/\..+/, '');
 
-        const canvas = Canvas.createCanvas(1200, 633);
+        /*
+        ============================================================
+        CANVAS
+        ============================================================
+        */
+
+        const WIDTH = 1200;
+        const HEIGHT = 633;
+
+        const canvas = Canvas.createCanvas(WIDTH, HEIGHT);
         const ctx = canvas.getContext('2d');
 
-        // ==========================================
-        // TŁO
-        // ==========================================
+        /*
+        ============================================================
+        TŁO
+        ============================================================
+        */
 
-        const background = await Canvas.loadImage(
-            'https://iili.io/nqND2ls.png'
-        );
+        const background = await Canvas
+            .loadImage('https://iili.io/nqND2ls.png')
+            .catch(() => null);
+
+        if (!background) {
+            console.error('Nie udało się pobrać tła.');
+            return;
+        }
 
         ctx.drawImage(
             background,
             0,
             0,
-            1200,
-            633
+            WIDTH,
+            HEIGHT
         );
 
-        // ==========================================
-        // AVATAR
-        // ==========================================
+        /*
+        ============================================================
+        AWATAR
+        ============================================================
+        */
 
-        const avatarURL = member.user.displayAvatarURL({
-            extension: 'png',
-            size: 512
-        });
-
-        const avatar = await Canvas.loadImage(avatarURL).catch(() => null);
-
-        const avatarX = 600;
-        const avatarY = 153;
+        const centerX = 600;
+        const centerY = 153;
         const avatarRadius = 104;
 
         // Obramowanie
@@ -59,41 +74,51 @@ async function sendWelcomeMessage(member) {
 
         ctx.beginPath();
         ctx.arc(
-            avatarX,
-            avatarY,
-            avatarRadius + 7,
+            centerX,
+            centerY,
+            avatarRadius + 6,
             0,
             Math.PI * 2
         );
 
-        ctx.fillStyle = '#000000';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
         ctx.fill();
 
         ctx.lineWidth = 3;
-        ctx.strokeStyle = '#FFFFFF';
+        ctx.strokeStyle = '#ffffff';
         ctx.stroke();
 
         ctx.restore();
 
         // Avatar
+        const avatarURL = member.user.displayAvatarURL({
+            extension: 'png',
+            size: 512
+        });
+
+        const avatar = await Canvas
+            .loadImage(avatarURL)
+            .catch(() => null);
+
         if (avatar) {
             ctx.save();
 
             ctx.beginPath();
             ctx.arc(
-                avatarX,
-                avatarY,
+                centerX,
+                centerY,
                 avatarRadius,
                 0,
                 Math.PI * 2
             );
 
+            ctx.closePath();
             ctx.clip();
 
             ctx.drawImage(
                 avatar,
-                avatarX - avatarRadius,
-                avatarY - avatarRadius,
+                centerX - avatarRadius,
+                centerY - avatarRadius,
                 avatarRadius * 2,
                 avatarRadius * 2
             );
@@ -101,114 +126,141 @@ async function sendWelcomeMessage(member) {
             ctx.restore();
         }
 
-        // ==========================================
-        // NAZWA UŻYTKOWNIKA
-        // ==========================================
+        /*
+        ============================================================
+        NAZWA UŻYTKOWNIKA
+        ============================================================
+        
+        WAŻNE:
+        Tekstu NIE rysujemy bezpośrednio na głównym canvasie.
+        Tworzymy osobny canvas dla tekstu.
+        ============================================================
+        */
+
+        const TEXT_CANVAS_WIDTH = 1000;
+        const TEXT_CANVAS_HEIGHT = 150;
+
+        const textCanvas = Canvas.createCanvas(
+            TEXT_CANVAS_WIDTH,
+            TEXT_CANVAS_HEIGHT
+        );
+
+        const textCtx = textCanvas.getContext('2d');
+
+        // Absolutnie wyzeruj transformację
+        textCtx.setTransform(1, 0, 0, 1, 0, 0);
+
+        textCtx.textAlign = 'center';
+        textCtx.textBaseline = 'middle';
 
         /*
-         * WAŻNE:
-         * Nie używamy:
-         * - ctx.scale()
-         * - transformacji
-         * - ręcznego skalowania tekstu
-         *
-         * Canvas dostaje normalny font i normalny fillText().
-         */
-
-        const centerX = 600;
-        const centerY = 390;
+        ------------------------------------------------------------
+        FONT
+        ------------------------------------------------------------
+        */
 
         let fontSize = 100;
 
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
+        textCtx.font = `bold ${fontSize}px DejaVu Sans`;
 
-        // Dobieramy rozmiar tylko na podstawie normalnego
-        // measureText().
-        ctx.font = `bold ${fontSize}px DejaVu Sans`;
+        /*
+        ------------------------------------------------------------
+        DOPASOWANIE DŁUGOŚCI NICKU
+        ------------------------------------------------------------
+        */
+
+        const maxTextWidth = 850;
 
         while (
-            ctx.measureText(username).width > 850 &&
-            fontSize > 30
+            textCtx.measureText(username).width > maxTextWidth &&
+            fontSize > 40
         ) {
             fontSize -= 2;
-            ctx.font = `bold ${fontSize}px DejaVu Sans`;
+            textCtx.font = `bold ${fontSize}px DejaVu Sans`;
         }
 
-        // ==========================================
-        // CZYSZCZENIE USTAWIEŃ
-        // ==========================================
+        /*
+        ------------------------------------------------------------
+        BIAŁY TEKST
+        ------------------------------------------------------------
+        */
 
-        ctx.globalAlpha = 1;
-        ctx.globalCompositeOperation = 'source-over';
+        textCtx.globalAlpha = 1;
 
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
+        // Bardzo ważne:
+        textCtx.fillStyle = '#FFFFFF';
+        textCtx.strokeStyle = 'transparent';
 
-        // ==========================================
-        // BIAŁY TEKST
-        // ==========================================
+        /*
+        ------------------------------------------------------------
+        RYSOWANIE TEKSTU
+        ------------------------------------------------------------
+        */
 
-        ctx.font = `bold ${fontSize}px DejaVu Sans`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
+        const textX = TEXT_CANVAS_WIDTH / 2;
+        const textY = TEXT_CANVAS_HEIGHT / 2;
 
-        // Bardzo delikatny cień
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-        ctx.shadowBlur = 6;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 3;
-
-        // KLUCZOWE:
-        // biały kolor ustawiamy bezpośrednio przed fillText
-        ctx.fillStyle = 'white';
-
-        ctx.fillText(
+        textCtx.fillText(
             username,
-            centerX,
-            centerY
+            textX,
+            textY
         );
 
-        // ==========================================
-        // DEBUG
-        // ==========================================
+        /*
+        ============================================================
+        WKLEJENIE GOTOWEGO TEKSTU NA BANER
+        ============================================================
+        
+        Y = 375
+        Możesz później zmienić tylko tę jedną wartość.
+        ============================================================
+        */
+
+        const finalTextY = 375;
+
+        ctx.drawImage(
+            textCanvas,
+            (WIDTH - TEXT_CANVAS_WIDTH) / 2,
+            finalTextY - TEXT_CANVAS_HEIGHT / 2
+        );
+
+        /*
+        ============================================================
+        DEBUG
+        ============================================================
+        */
 
         console.log('======================================');
         console.log('🖼️ WELCOME BANNER');
         console.log('👤 Username:', username);
-        console.log('🔠 Font:', ctx.font);
-        console.log('📏 Width:', ctx.measureText(username).width);
-        console.log('📍 X:', centerX);
-        console.log('📍 Y:', centerY);
-        console.log('🎨 Color:', ctx.fillStyle);
+        console.log('🔠 Font:', `bold ${fontSize}px DejaVu Sans`);
+        console.log(
+            '📏 Text width:',
+            textCtx.measureText(username).width
+        );
+        console.log('📍 X:', WIDTH / 2);
+        console.log('📍 Y:', finalTextY);
+        console.log('🎨 Kolor: BIAŁY #FFFFFF');
         console.log('======================================');
 
-        // ==========================================
-        // PNG
-        // ==========================================
-
-        const buffer = canvas.toBuffer('image/png');
+        /*
+        ============================================================
+        ZAŁĄCZNIK
+        ============================================================
+        */
 
         const attachment = new AttachmentBuilder(
-            buffer,
+            canvas.toBuffer('image/png'),
             {
                 name: 'welcome-banner.png'
             }
         );
 
-        // ==========================================
-        // DATA KONTA
-        // ==========================================
-
-        const formattedDate = member.user.createdAt
-            .toISOString()
-            .replace('T', ' ')
-            .replace(/\..+/, '');
-
-        // ==========================================
-        // EMBED
-        // ==========================================
+        /*
+        ============================================================
+        EMBED
+        ============================================================
+        */
 
         const embed = new EmbedBuilder()
             .setColor(16764416)
@@ -233,7 +285,7 @@ async function sendWelcomeMessage(member) {
 
     } catch (error) {
         console.error(
-            '❌ Błąd welcome:',
+            '❌ Błąd podczas generowania powitania:',
             error
         );
     }
