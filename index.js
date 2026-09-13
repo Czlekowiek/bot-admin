@@ -20,7 +20,7 @@ const CHANNEL_IDS = [
     '1542122713676644352'
 ];
 
-// Zaktualizowana lista ról z poprawionymi emoji dla Moderatora i Junior Moderatora
+// Lista ról
 const ROLES_TO_TRACK = [
     { id: '1542127037202825326', name: '<:owner_gradient:1548652163272675452> Właściciel' },
     { id: '1542127233093869701', name: '<:admin_yellow:1548649419434627246> Współwłaściciel' },
@@ -67,6 +67,7 @@ async function generateEmbed(guild) {
 
     const embed = new EmbedBuilder()
         .setDescription(descriptionText.trim())
+        .setImage('https://cdn.discordapp.com/attachments/1545884336782446612/1548667700161544252/Zaokraglone_logo.png')
         .setColor(16764416)
         .setFooter({
             text: `Stworzone przez @czlekowiek • Ostatnia aktualizacja: ${formattedTime}`,
