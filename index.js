@@ -86,7 +86,8 @@ async function updateAdminMessage(guild) {
             let botMessage = messages ? messages.find(m => m.author.id === client.user.id) : null;
 
             if (botMessage) {
-                await botMessage.edit({ embeds: [newEmbed] });
+                // Wysyłamy pustą treść (content: null lub usunięty), żeby nad embedem nie było żadnego tekstu
+                await botMessage.edit({ content: null, embeds: [newEmbed] });
             } else {
                 await channel.send({ embeds: [newEmbed] });
             }
