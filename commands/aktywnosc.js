@@ -50,4 +50,4 @@ module.exports = {
 
         await interaction.reply({ content: 'Pomyślnie utworzono wiadomość aktywności.', ephemeral: true });
     },
-};
+}; 
