@@ -3,20 +3,7 @@ const Canvas = require('canvas');
 
 async function sendLeaveMessage(member) {
     try {
-        // =========================================================
-        // KONFIGURACJA
-        // =========================================================
-
         const LEAVE_CHANNEL_ID = '1542121319263641683';
-
-        const WIDTH = 1200;
-        const HEIGHT = 633;
-
-        const BACKGROUND_URL = 'https://iili.io/nqeNgnV.png';
-
-        // =========================================================
-        // KANAŁ POŻEGNAŃ
-        // =========================================================
 
         const channel = await member.guild.channels
             .fetch(LEAVE_CHANNEL_ID)
@@ -27,23 +14,9 @@ async function sendLeaveMessage(member) {
             return;
         }
 
-        // =========================================================
-        // INFORMACJE O UŻYTKOWNIKU
-        // =========================================================
-
         const memberCount = member.guild.memberCount;
-
-        // Username = nazwa konta Discord
         const username = member.user.username;
-
-        // Display name = nazwa wyświetlana na serwerze
-        const displayName = member.displayName;
-
         const serverName = member.guild.name;
-
-        // =========================================================
-        // DATA UTWORZENIA KONTA
-        // =========================================================
 
         const createdAt = member.user.createdAt;
 
@@ -56,6 +29,9 @@ async function sendLeaveMessage(member) {
         // CANVAS
         // =========================================================
 
+        const WIDTH = 1200;
+        const HEIGHT = 633;
+
         const canvas = Canvas.createCanvas(WIDTH, HEIGHT);
         const ctx = canvas.getContext('2d');
 
@@ -67,9 +43,9 @@ async function sendLeaveMessage(member) {
         // =========================================================
 
         const background = await Canvas
-            .loadImage(BACKGROUND_URL)
+            .loadImage('https://iili.io/nqeNgnV.png')
             .catch((error) => {
-                console.error('❌ Błąd pobierania tła:', error);
+                console.error('❌ Błąd pobierania tła pożegnania:', error);
                 return null;
             });
 
@@ -136,20 +112,50 @@ async function sendLeaveMessage(member) {
         }
 
         // =========================================================
-        // TEKST NA OBRAZKU (DYNAMICZNE SKALOWANIE I POZYCJA)
+        // TEKST - SVG
         // =========================================================
 
         const NORMAL_FONT_SIZE = 85;
         const MAX_TEXT_WIDTH = 850;
-
-        // Normalny tekst
-        const NORMAL_TEXT_Y = 373;
-
-        // Długie nazwy (wyższa pozycja zapobiegająca wychodzeniu poza ramę)
-        const LONG_TEXT_Y = 355; 
+        const MIN_FONT_SIZE = 40;
+        const NORMAL_TEXT_Y = 375;
 
         // =========================================================
-        // ESCAPE ZNAKÓW DLA SVG
+        // AUTOMATYCZNE ZMNIEJSZANIE CZCIONKI
+        // =========================================================
+
+        const estimatedWidthAt85 = username.length * 48;
+
+        let FONT_SIZE = NORMAL_FONT_SIZE;
+
+        if (estimatedWidthAt85 > MAX_TEXT_WIDTH) {
+            FONT_SIZE = Math.floor(
+                NORMAL_FONT_SIZE *
+                MAX_TEXT_WIDTH /
+                estimatedWidthAt85
+            );
+
+            if (FONT_SIZE < MIN_FONT_SIZE) {
+                FONT_SIZE = MIN_FONT_SIZE;
+            }
+        }
+
+        // =========================================================
+        // AUTOMATYCZNE PRZESUNIĘCIE DŁUGIEGO TEKSTU W GÓRĘ
+        // =========================================================
+
+        const sizeDifference =
+            NORMAL_FONT_SIZE - FONT_SIZE;
+
+        const TEXT_Y =
+            NORMAL_TEXT_Y -
+            Math.min(
+                12,
+                sizeDifference * 0.25
+            ) - 2;
+
+        // =========================================================
+        // ESCAPE DLA SVG
         // =========================================================
 
         const escapeXml = (text) => {
@@ -164,40 +170,7 @@ async function sendLeaveMessage(member) {
         const safeUsername = escapeXml(username);
 
         // =========================================================
-        // SPRAWDZANIE DŁUGOŚCI NAZWY
-        // =========================================================
-
-        let fontSize = NORMAL_FONT_SIZE;
-
-        const measureCanvas = Canvas.createCanvas(
-            1200,
-            200
-        );
-
-        const measureCtx = measureCanvas.getContext('2d');
-
-        measureCtx.font = `900 ${fontSize}px "DejaVu Sans"`;
-
-        while (
-            measureCtx.measureText(username).width > MAX_TEXT_WIDTH &&
-            fontSize > 35
-        ) {
-            fontSize -= 2;
-
-            measureCtx.font = `900 ${fontSize}px "DejaVu Sans"`;
-        }
-
-        // =========================================================
-        // POZYCJA TEKSTU
-        // =========================================================
-
-        const textY =
-            fontSize < NORMAL_FONT_SIZE
-                ? LONG_TEXT_Y
-                : NORMAL_TEXT_Y;
-
-        // =========================================================
-        // SVG Z TEKSTEM
+        // SVG TEKSTU
         // =========================================================
 
         const textSvg = `
@@ -209,21 +182,21 @@ async function sendLeaveMessage(member) {
 >
     <text
         x="600"
-        y="${textY}"
+        y="${TEXT_Y}"
         text-anchor="middle"
         dominant-baseline="middle"
         fill="#FFFFFF"
         fill-opacity="1"
         stroke="none"
         font-family="DejaVu Sans, Arial, sans-serif"
-        font-size="${fontSize}px"
+        font-size="${FONT_SIZE}px"
         font-weight="900"
     >${safeUsername}</text>
 </svg>
 `;
 
         // =========================================================
-        // RENDEROWANIE TEKSTU
+        // ŁADOWANIE SVG
         // =========================================================
 
         const textImage = await Canvas
@@ -235,7 +208,6 @@ async function sendLeaveMessage(member) {
                     '❌ Błąd renderowania SVG:',
                     error
                 );
-
                 return null;
             });
 
@@ -243,12 +215,11 @@ async function sendLeaveMessage(member) {
             console.error(
                 '❌ Nie udało się utworzyć tekstu SVG.'
             );
-
             return;
         }
 
         // =========================================================
-        // WKLEJENIE TEKSTU NA BANER
+        // WKLEJENIE TEKSTU
         // =========================================================
 
         ctx.save();
@@ -273,14 +244,15 @@ async function sendLeaveMessage(member) {
         console.log('======================================');
         console.log('👋 LEAVE BANNER');
         console.log('👤 Username:', username);
-        console.log('👤 Display Name:', displayName);
-        console.log('🔠 Font size:', fontSize);
+        console.log('🔠 Font: SVG DejaVu Sans');
+        console.log('🔠 Font size:', FONT_SIZE);
+        console.log('📏 Max text width:', MAX_TEXT_WIDTH);
         console.log('📍 X:', 600);
-        console.log('📍 Y:', textY);
+        console.log('📍 Y:', TEXT_Y);
         console.log('🎨 Kolor: #FFFFFF');
+        console.log('💪 Font weight: 900');
         console.log('🖼️ Tło:', background ? 'OK' : 'BRAK');
         console.log('👤 Avatar:', avatar ? 'OK' : 'BRAK');
-        console.log('👥 Liczba członków:', memberCount);
         console.log('======================================');
 
         // =========================================================
@@ -299,6 +271,8 @@ async function sendLeaveMessage(member) {
         // =========================================================
         // EMBED
         // =========================================================
+
+        const displayName = member.displayName;
 
         const embed = new EmbedBuilder()
             .setColor(16764416)
@@ -322,7 +296,7 @@ async function sendLeaveMessage(member) {
         });
 
         console.log(
-            `👋 Pożegnanie wysłane dla ${displayName}`
+            `👋 Pożegnanie wysłane dla ${username}`
         );
 
     } catch (error) {
@@ -332,10 +306,6 @@ async function sendLeaveMessage(member) {
         );
     }
 }
-
-// =========================================================
-// EXPORT
-// =========================================================
 
 module.exports = {
     sendLeaveMessage
