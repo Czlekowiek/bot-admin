@@ -6,7 +6,7 @@ async function sendWelcomeMessage(member) {
         const WELCOME_CHANNEL_ID = '1542121319263641682';
 
         // ==========================================
-        // KANAŁ
+        // KANAŁ POWITALNY
         // ==========================================
 
         const channel = await member.guild.channels
@@ -19,7 +19,7 @@ async function sendWelcomeMessage(member) {
         }
 
         // ==========================================
-        // INFORMACJE
+        // INFORMACJE O UŻYTKOWNIKU
         // ==========================================
 
         const username = member.user.username;
@@ -52,11 +52,17 @@ async function sendWelcomeMessage(member) {
         const background = await Canvas
             .loadImage('https://iili.io/nqND2ls.png')
             .catch((error) => {
-                console.error('❌ Nie udało się pobrać tła:', error);
+                console.error(
+                    '❌ Nie udało się pobrać obrazka tła:',
+                    error
+                );
+
                 return null;
             });
 
-        if (!background) return;
+        if (!background) {
+            return;
+        }
 
         ctx.drawImage(
             background,
@@ -67,7 +73,7 @@ async function sendWelcomeMessage(member) {
         );
 
         // ==========================================
-        // AVATAR
+        // AVATAR - OBRAMOWANIE
         // ==========================================
 
         const avatarX = 600;
@@ -97,10 +103,18 @@ async function sendWelcomeMessage(member) {
 
         ctx.restore();
 
+        // ==========================================
+        // AVATAR UŻYTKOWNIKA
+        // ==========================================
+
         const avatar = await Canvas
             .loadImage(avatarURL)
             .catch((error) => {
-                console.error('❌ Nie udało się pobrać avatara:', error);
+                console.error(
+                    '❌ Nie udało się pobrać avatara:',
+                    error
+                );
+
                 return null;
             });
 
@@ -118,6 +132,7 @@ async function sendWelcomeMessage(member) {
             );
 
             ctx.closePath();
+
             ctx.clip();
 
             ctx.drawImage(
@@ -132,54 +147,56 @@ async function sendWelcomeMessage(member) {
         }
 
         // ==========================================
-        // USERNAME
+        // NAZWA UŻYTKOWNIKA
         // ==========================================
 
         ctx.save();
 
         /*
-         * Bazowy font 10px + skalowanie.
+         * Nie używamy bezpośrednio 80px,
+         * ponieważ na Render/node-canvas wcześniej
+         * pojawiał się problem z rozmiarem tekstu.
          *
-         * Dzięki temu omijamy problem Render/node-canvas
-         * z nieprawidłowym rozmiarem fontu.
+         * Zamiast tego używamy 10px i skalujemy Canvas.
          */
 
         const baseFontSize = 10;
-
         let targetFontSize = 80;
 
         const maxWidth = 850;
 
+        // Font
         ctx.font = `bold ${baseFontSize}px "DejaVu Sans"`;
 
+        // Szerokość tekstu
         const baseTextWidth = ctx.measureText(username).width;
 
+        // Skala
         let scale = targetFontSize / baseFontSize;
 
+        // Docelowa szerokość
         let finalTextWidth = baseTextWidth * scale;
 
-        // Automatyczne zmniejszanie bardzo długich nicków
+        // Jeżeli nick jest za długi,
+        // automatycznie zmniejszamy tekst
         if (finalTextWidth > maxWidth) {
             scale = maxWidth / baseTextWidth;
+
             targetFontSize = baseFontSize * scale;
+
             finalTextWidth = maxWidth;
         }
 
         // ==========================================
-        // POZYCJA TEKSTU
+        // POZYCJA
         // ==========================================
 
         const centerX = 600;
 
-        /*
-         * Było 355.
-         *
-         * Teraz przesuwamy tekst trochę NIŻEJ.
-         * Możesz później zmienić na 365 / 375 / 385.
-         */
-
+        // Ta pozycja jest już według Ciebie dobra
         const textY = 375;
 
+        // Przeliczenie przez skalę
         const scaledCenterX = centerX / scale;
         const scaledTextY = textY / scale;
 
@@ -203,8 +220,7 @@ async function sendWelcomeMessage(member) {
             scaledCenterX - (baseTextWidth / 2);
 
         // ==========================================
-        // WAŻNE:
-        // RESETUJEMY WSZYSTKO
+        // RESET STANU CANVAS
         // ==========================================
 
         ctx.globalAlpha = 1;
@@ -217,25 +233,10 @@ async function sendWelcomeMessage(member) {
         ctx.shadowOffsetY = 0;
 
         // ==========================================
-        // CZARNY OBRYS
+        // BIAŁY TEKST
         // ==========================================
 
-        ctx.lineJoin = 'round';
-        ctx.lineWidth = 1.8;
-
-        ctx.strokeStyle = '#000000';
-
-        ctx.strokeText(
-            username,
-            textX,
-            scaledTextY
-        );
-
-        // ==========================================
-        // BIAŁE WYPEŁNIENIE
-        // ==========================================
-
-        ctx.fillStyle = '#FFFFFF';
+        ctx.fillStyle = 'rgb(255, 255, 255)';
 
         ctx.fillText(
             username,
@@ -246,7 +247,7 @@ async function sendWelcomeMessage(member) {
         ctx.restore();
 
         // ==========================================
-        // DEBUG
+        // LOGI
         // ==========================================
 
         console.log('======================================');
@@ -258,12 +259,11 @@ async function sendWelcomeMessage(member) {
         console.log('🔎 Skala:', scale);
         console.log('📍 Środek X:', centerX);
         console.log('📍 Pozycja Y:', textY);
-        console.log('🎨 Wypełnienie: #FFFFFF');
-        console.log('🎨 Obramowanie: #000000');
+        console.log('🎨 Wypełnienie: rgb(255, 255, 255)');
         console.log('======================================');
 
         // ==========================================
-        // PNG
+        // TWORZENIE ZAŁĄCZNIKA
         // ==========================================
 
         const attachment = new AttachmentBuilder(
@@ -304,7 +304,7 @@ async function sendWelcomeMessage(member) {
 
     } catch (error) {
         console.error(
-            '❌ Błąd podczas generowania powitania:',
+            '❌ Błąd podczas generowania i wysyłania powitania:',
             error
         );
     }
