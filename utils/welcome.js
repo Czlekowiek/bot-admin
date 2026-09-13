@@ -1,8 +1,44 @@
 const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const Canvas = require('canvas');
+const fs = require('fs/promises');
+const path = require('path');
+const os = require('os');
+
+let fontLoaded = false;
+
+async function ensureFontLoaded() {
+    if (fontLoaded) return;
+    
+    const fontPath = path.join(os.tmpdir(), 'Poppins-Bold.ttf');
+    try {
+        // Sprawdzamy czy plik już istnieje
+        await fs.access(fontPath);
+    } catch {
+        try {
+            // Bezpieczne pobieranie z timeoutem / obsługą błędu sieciowego
+            const response = await fetch('https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const buffer = Buffer.from(await response.arrayBuffer());
+            await fs.writeFile(fontPath, buffer);
+        } catch (error) {
+            console.error('Nie udało się pobrać czcionki Poppins, używam domyślnej:', error);
+            return; // Jeśli pobieranie nie powiodło się, kod poleci na domyślnej czcionce bez wywalania bota
+        }
+    }
+
+    try {
+        Canvas.registerFont(fontPath, { family: 'Poppins', weight: 'bold' });
+        fontLoaded = true;
+    } catch (error) {
+        console.error('Błąd rejestracji czcionki:', error);
+    }
+}
 
 async function sendWelcomeMessage(member) {
     try {
+        // Bezpieczne ładowanie czcionki w tle (nie blokuje i nie wywala aplikacji w razie bledu)
+        await ensureFontLoaded();
+
         const WELCOME_CHANNEL_ID = '1542121319263641682';
         const channel = await member.guild.channels.fetch(WELCOME_CHANNEL_ID).catch(() => null);
         if (!channel) return;
@@ -12,15 +48,19 @@ async function sendWelcomeMessage(member) {
         const formattedDate = createdAt.toISOString().replace(/T/, ' ').replace(/\..+/, '');
         
         const avatarURL = member.user.displayAvatarURL({ extension: 'png', size: 512 });
-        const username = member.user.username;
+        let username = member.user.username;
         const serverName = member.guild.name;
 
         // 1. Tworzenie płótna 1200x633 px
         const canvas = Canvas.createCanvas(1200, 633);
         const ctx = canvas.getContext('2d');
 
-        // 2. Wczytanie i narysowanie tła
-        const background = await Canvas.loadImage('https://iili.io/nqND2ls.png');
+        // 2. Wczytanie i narysowanie tła (zabezpieczenie przed błędem ładowania obrazka)
+        const background = await Canvas.loadImage('https://iili.io/nqND2ls.png').catch(() => null);
+        if (!background) {
+            console.error('Nie udało się pobrać obrazka tła!');
+            return;
+        }
         ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
 
         // 3. Koordynaty awatara (środek koła X: 600, Y: 153)
@@ -41,22 +81,32 @@ async function sendWelcomeMessage(member) {
         ctx.restore();
 
         // 5. Właściwy awatar użytkownika wycięty w koło
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, avatarRadius, 0, Math.PI * 2, true);
-        ctx.closePath();
-        ctx.clip();
+        const avatar = await Canvas.loadImage(avatarURL).catch(() => null);
+        if (avatar) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, avatarRadius, 0, Math.PI * 2, true);
+            ctx.closePath();
+            ctx.clip();
+            ctx.drawImage(avatar, centerX - avatarRadius, centerY - avatarRadius, avatarRadius * 2, avatarRadius * 2);
+            ctx.restore();
+        }
 
-        const avatar = await Canvas.loadImage(avatarURL);
-        ctx.drawImage(avatar, centerX - avatarRadius, centerY - avatarRadius, avatarRadius * 2, avatarRadius * 2);
-        ctx.restore();
-
-        // 6. Rysowanie nazwy użytkownika (Zabezpieczone przed awarią czcionki - jawny rozmiar i biały kolor)
+        // 6. Rysowanie nazwy użytkownika z zabezpieczeniem przed zbyt długim nickiem
         ctx.save();
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = '700 44px Arial, sans-serif'; // Użycie bezpiecznego Arial zamiast Poppins, żeby Render na pewno to odczytał
+        
+        let fontSize = 46;
+        ctx.font = `bold ${fontSize}px "Poppins", sans-serif`;
+        
+        // Jeśli nick jest za długi, automatycznie zmniejszamy czcionkę, żeby nie wychodził poza tło
+        if (ctx.measureText(username).width > 700) {
+            fontSize = 36;
+            ctx.font = `bold ${fontSize}px "Poppins", sans-serif`;
+        }
+
         ctx.fillText(username, 606, 355);
         ctx.restore();
 
