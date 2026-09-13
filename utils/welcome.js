@@ -1,5 +1,5 @@
 const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
-const { drawCard } = require('discord-welcome-card');
+const { WelcomeBuilder } = require('discord-card-canvas');
 
 async function sendWelcomeMessage(member) {
     try {
@@ -15,29 +15,32 @@ async function sendWelcomeMessage(member) {
         const username = member.user.username;
         const serverName = member.guild.name;
 
-        // Generowanie karty z awatarem na środku i tekstem pod spodem
-        const image = await drawCard({
-            theme: 'dark',
-            text: {
-                title: serverName,
-                text: username,
-                subtitle: `Jesteś naszym ${memberCount} członkiem`,
-                color: '#ffffff'
+        // Samodzielne generowanie banera graficznego przez bota
+        const card = await new WelcomeBuilder({
+            fontDefault: 'Inter',
+            backgroundImgURL: 'https://images.unsplash.com/photo-1518684079-3c830dcef090?q=80&w=1000&auto=format&fit=crop',
+            avatarImgURL: avatarURL,
+            avatarBorderColor: '#ffffff',
+            avatarBackgroundColor: '#1e1e1e',
+            overlayOpacity: 0.4,
+            mainText: {
+                content: serverName,
+                color: '#ffffff',
+                size: 42
             },
-            avatar: {
-                image: avatarURL,
-                rounded: true,
-                outlineWidth: 5,
-                outlineColor: '#ffffff'
+            nicknameText: {
+                content: username,
+                color: '#ffaa00',
+                size: 36
             },
-            card: {
-                background: 'https://images.unsplash.com/photo-1518684079-3c830dcef090?q=80&w=1000&auto=format&fit=crop',
-                blur: 1,
-                rounded: true
+            secondText: {
+                content: `Jesteś naszym ${memberCount} członkiem!`,
+                color: '#dddddd',
+                size: 26
             }
-        });
+        }).build();
 
-        const attachment = new AttachmentBuilder(image, { name: 'welcome-banner.png' });
+        const attachment = new AttachmentBuilder(card.toBuffer(), { name: 'welcome-banner.png' });
 
         const embed = new EmbedBuilder()
             .setColor(16764416)
@@ -51,7 +54,7 @@ async function sendWelcomeMessage(member) {
 
         await channel.send({ embeds: [embed], files: [attachment] });
     } catch (error) {
-        console.error('Błąd podczas wysyłania powitania:', error);
+        console.error('Błąd podczas generowania i wysyłania powitania:', error);
     }
 }
 
