@@ -20,7 +20,7 @@ const CHANNEL_IDS = [
     '1542122713676644352'
 ];
 
-// Pełna lista ról z Twojego wzoru wraz z dedykowanymi emoji
+// Pełna lista ról wraz z dedykowanymi emoji
 const ROLES_TO_TRACK = [
     { id: '1542127037202825326', name: '<:owner_gradient:1548652163272675452> Właściciel' },
     { id: '1543676695377215629', name: '<:admin_darkpurple:1548650402503852032> Technik' },
@@ -30,8 +30,6 @@ const ROLES_TO_TRACK = [
     { id: '1542127336193785886', name: '<:admin_blue:1548649538389024768> Developer' },
     { id: '1543996411350098010', name: '<:admin_turquoise:1548650090703491153> Zarząd Frakcji' }
 ];
-
-const targetMessages = {};
 
 async function generateEmbed(guild) {
     await guild.members.fetch().catch(() => {});
@@ -50,11 +48,23 @@ async function generateEmbed(guild) {
         descriptionText += `## ${roleData.name}\n${membersList}\n\n`;
     }
 
+    // Pobranie aktualnego czasu w czytelnym formacie PL
+    const now = new Date();
+    const formattedTime = now.toLocaleString('pl-PL', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+
     const embed = new EmbedBuilder()
+        .setTitle('<:staff:1548644739237027902> Skład administracji serwera')
         .setDescription(descriptionText.trim())
         .setColor(16764416)
         .setFooter({
-            text: 'Stworzone przez @czlekowiek',
+            text: `Stworzone przez @czlekowiek • Ostatnia aktualizacja: ${formattedTime}`,
             icon_url: 'https://cdn.discordapp.com/attachments/1548638166389366834/1548644226399600680/czlekowiek-avatar-1024.png'
         });
 
@@ -64,7 +74,6 @@ async function generateEmbed(guild) {
 async function updateAdminMessage(guild) {
     try {
         const newEmbed = await generateEmbed(guild);
-        const contentText = '# <:staff:1548644739237027902> Skład Administracji';
 
         for (const channelId of CHANNEL_IDS) {
             const channel = await guild.channels.fetch(channelId).catch(() => null);
@@ -73,15 +82,13 @@ async function updateAdminMessage(guild) {
                 continue;
             }
 
-            if (!targetMessages[channelId]) {
-                const messages = await channel.messages.fetch({ limit: 10 });
-                targetMessages[channelId] = messages.find(m => m.author.id === client.user.id);
-            }
+            const messages = await channel.messages.fetch({ limit: 10 }).catch(() => null);
+            let botMessage = messages ? messages.find(m => m.author.id === client.user.id) : null;
 
-            if (targetMessages[channelId]) {
-                await targetMessages[channelId].edit({ content: contentText, embeds: [newEmbed] });
+            if (botMessage) {
+                await botMessage.edit({ embeds: [newEmbed] });
             } else {
-                targetMessages[channelId] = await channel.send({ content: contentText, embeds: [newEmbed] });
+                await channel.send({ embeds: [newEmbed] });
             }
         }
         
