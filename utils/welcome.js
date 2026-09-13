@@ -1,106 +1,265 @@
-const { createCanvas, loadImage } = require("canvas");
-const {
-    AttachmentBuilder
-} = require("discord.js");
+const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const Canvas = require('canvas');
 
-async function createWelcomeBanner(member) {
-    // =========================================================
-    // USTAWIENIA
-    // =========================================================
+async function sendWelcomeMessage(member) {
+    try {
+        const WELCOME_CHANNEL_ID = '1542121319263641682';
 
-    const WIDTH = 1200;
-    const HEIGHT = 500;
+        const channel = await member.guild.channels
+            .fetch(WELCOME_CHANNEL_ID)
+            .catch(() => null);
 
-    // Tekst
-    const FONT_SIZE = 90;
-    const TEXT_Y = 360;
+        if (!channel) {
+            console.error('Nie znaleziono kanału powitalnego.');
+            return;
+        }
 
-    // Kolor tekstu
-    const TEXT_COLOR = "#FFFFFF";
+        const memberCount = member.guild.memberCount;
+        const username = member.user.username;
+        const serverName = member.guild.name;
 
-    // Grubość obrysu
-    const STROKE_WIDTH = 0;
+        const createdAt = member.user.createdAt;
 
-    // =========================================================
-    // TWORZENIE CANVASA
-    // =========================================================
+        const formattedDate = createdAt
+            .toISOString()
+            .replace(/T/, ' ')
+            .replace(/\..+/, '');
 
-    const canvas = createCanvas(WIDTH, HEIGHT);
-    const ctx = canvas.getContext("2d");
+        // =========================================================
+        // CANVAS
+        // =========================================================
 
-    // =========================================================
-    // TŁO
-    // =========================================================
+        const WIDTH = 1200;
+        const HEIGHT = 633;
 
-    // Tutaj ustaw swoje tło.
-    // Jeżeli masz obraz tła, podaj jego ścieżkę w loadImage().
-    //
-    // Na razie robimy przezroczyste tło, żeby Canvas
-    // NIE dodawał czarnego kwadratu.
+        const canvas = Canvas.createCanvas(WIDTH, HEIGHT);
+        const ctx = canvas.getContext('2d');
 
-    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+        // Zawsze normalne nakładanie elementów
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
 
-    // =========================================================
-    // TEKST UŻYTKOWNIKA
-    // =========================================================
+        // =========================================================
+        // TŁO
+        // =========================================================
 
-    const username = member.user.username;
+        const background = await Canvas
+            .loadImage('https://iili.io/nqND2ls.png')
+            .catch(() => null);
 
-    // Ustawiamy font BEZ ŻADNEGO skalowania canvasu.
-    ctx.font = `bold ${FONT_SIZE}px "DejaVu Sans"`;
+        if (!background) {
+            console.error('Nie udało się pobrać tła.');
+            return;
+        }
 
-    // Wyśrodkowanie
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
+        ctx.drawImage(
+            background,
+            0,
+            0,
+            WIDTH,
+            HEIGHT
+        );
 
-    // Bardzo ważne:
-    // resetujemy transformacje
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+        // =========================================================
+        // AVATAR
+        // =========================================================
 
-    // =========================================================
-    // RYSOWANIE TEKSTU
-    // =========================================================
+        const centerX = 600;
+        const centerY = 153;
+        const avatarRadius = 104;
 
-    ctx.fillStyle = TEXT_COLOR;
+        // Obramowanie avatara
+        ctx.save();
 
-    if (STROKE_WIDTH > 0) {
-        ctx.lineWidth = STROKE_WIDTH;
-        ctx.strokeStyle = "#000000";
-        ctx.strokeText(
+        ctx.beginPath();
+
+        ctx.arc(
+            centerX,
+            centerY,
+            avatarRadius + 6,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fill();
+
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+
+        ctx.restore();
+
+        // Avatar użytkownika
+        const avatarURL = member.user.displayAvatarURL({
+            extension: 'png',
+            size: 512
+        });
+
+        const avatar = await Canvas
+            .loadImage(avatarURL)
+            .catch(() => null);
+
+        if (avatar) {
+            ctx.save();
+
+            ctx.beginPath();
+
+            ctx.arc(
+                centerX,
+                centerY,
+                avatarRadius,
+                0,
+                Math.PI * 2
+            );
+
+            ctx.closePath();
+            ctx.clip();
+
+            ctx.drawImage(
+                avatar,
+                centerX - avatarRadius,
+                centerY - avatarRadius,
+                avatarRadius * 2,
+                avatarRadius * 2
+            );
+
+            ctx.restore();
+        }
+
+        // =========================================================
+        // NAZWA UŻYTKOWNIKA
+        // =========================================================
+
+        ctx.save();
+
+        // Absolutny reset transformacji
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+        // Normalne rysowanie
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+
+        // Wyśrodkowanie tekstu
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // =========================================================
+        // CZCIONKA
+        // =========================================================
+
+        let fontSize = 100;
+
+        const maxTextWidth = 850;
+
+        ctx.font = `bold ${fontSize}px "DejaVu Sans"`;
+
+        // Dopasowanie bardzo długich nicków
+        while (
+            ctx.measureText(username).width > maxTextWidth &&
+            fontSize > 45
+        ) {
+            fontSize -= 2;
+            ctx.font = `bold ${fontSize}px "DejaVu Sans"`;
+        }
+
+        // =========================================================
+        // KOLOR
+        // =========================================================
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+
+        // Brak obrysu
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0)';
+        ctx.lineWidth = 0;
+
+        // =========================================================
+        // POZYCJA
+        // =========================================================
+
+        const textX = WIDTH / 2;
+
+        // Celowo wyżej niż poprzednie 375
+        const textY = 360;
+
+        // =========================================================
+        // TEKST
+        // =========================================================
+
+        ctx.fillText(
             username,
-            WIDTH / 2,
-            TEXT_Y
+            textX,
+            textY
+        );
+
+        ctx.restore();
+
+        // =========================================================
+        // DEBUG
+        // =========================================================
+
+        console.log('======================================');
+        console.log('🖼️ WELCOME BANNER');
+        console.log('👤 Username:', username);
+        console.log('🔠 Font:', `bold ${fontSize}px "DejaVu Sans"`);
+        console.log(
+            '📏 Text width:',
+            ctx.measureText(username).width
+        );
+        console.log('📍 X:', textX);
+        console.log('📍 Y:', textY);
+        console.log('🎨 Kolor: #FFFFFF');
+        console.log('🔄 Transform: 1, 0, 0, 1, 0, 0');
+        console.log('======================================');
+
+        // =========================================================
+        // ZAŁĄCZNIK
+        // =========================================================
+
+        const attachment = new AttachmentBuilder(
+            canvas.toBuffer('image/png'),
+            {
+                name: 'welcome-banner.png'
+            }
+        );
+
+        // =========================================================
+        // EMBED
+        // =========================================================
+
+        const embed = new EmbedBuilder()
+            .setColor(16764416)
+            .setDescription(
+                `### ${username}\n\n` +
+                `Cześć **${username}**! Witaj na **${serverName}**!\n` +
+                `Jesteś naszym **${memberCount}** członkiem. Miłego pobytu!`
+            )
+            .setImage('attachment://welcome-banner.png')
+            .setFooter({
+                text: `Data utworzenia konta: ${formattedDate}`
+            });
+
+        // =========================================================
+        // WYSŁANIE
+        // =========================================================
+
+        await channel.send({
+            embeds: [embed],
+            files: [attachment]
+        });
+
+        console.log(
+            `✅ Powitanie wysłane dla ${username}`
+        );
+
+    } catch (error) {
+        console.error(
+            '❌ Błąd podczas generowania powitania:',
+            error
         );
     }
-
-    ctx.fillText(
-        username,
-        WIDTH / 2,
-        TEXT_Y
-    );
-
-    // =========================================================
-    // DEBUG
-    // =========================================================
-
-    console.log("======================================");
-    console.log("🖼️ WELCOME BANNER");
-    console.log("👤 Username:", username);
-    console.log("🔠 Font:", ctx.font);
-    console.log("📏 Text width:", ctx.measureText(username).width);
-    console.log("📍 X:", WIDTH / 2);
-    console.log("📍 Y:", TEXT_Y);
-    console.log("🎨 Color:", ctx.fillStyle);
-    console.log("🔄 Transform:", ctx.getTransform());
-    console.log("======================================");
-
-    // =========================================================
-    // ZWRACAMY OBRAZ
-    // =========================================================
-
-    return canvas.toBuffer("image/png");
 }
 
 module.exports = {
-    createWelcomeBanner
+    sendWelcomeMessage
 };
