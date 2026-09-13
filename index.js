@@ -39,6 +39,20 @@ const CHANNEL_IDS = [
     '1542122713676644352'
 ];
 
+const LOG_CHANNEL_ID = '1548682257320120380';
+
+// Funkcja pomocnicza do wysyłania logów
+async function sendLog(content) {
+    try {
+        const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+        if (channel) {
+            await channel.send({ content });
+        }
+    } catch (error) {
+        console.error('Błąd podczas wysyłania logu:', error);
+    }
+}
+
 async function updateAdminMessage(guild) {
     try {
         const newEmbed = await generateStaffEmbed(guild);
@@ -63,6 +77,7 @@ async function updateAdminMessage(guild) {
 
 client.once('ready', async () => {
     console.log(`Zalogowano jako ${client.user.tag}!`);
+    await sendLog(`🟢 **Bot został uruchomiony!** Zalogowano jako \`${client.user.tag}\`.`);
 
     const guild = client.guilds.cache.first();
     if (guild) {
@@ -86,10 +101,15 @@ client.on('interactionCreate', async interaction => {
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
 
+    // Logowanie użycia komendy
+    await sendLog(`⚙️ Użytkownik **${interaction.user.tag}** użył komendy \`/${interaction.commandName}\` na kanale <#${interaction.channelId}>.`);
+
     try {
         await command.execute(interaction);
     } catch (error) {
         console.error(error);
+        await sendLog(`❌ Błąd podczas wykonywania komendy \`/${interaction.commandName}\` przez **${interaction.user.tag}**: \`${error.message}\``);
+        
         const replyOptions = { content: 'Wystąpił błąd podczas wykonywania tej komendy!', ephemeral: true };
         if (interaction.replied || interaction.deferred) {
             await interaction.followUp(replyOptions);
@@ -167,6 +187,17 @@ async function updateActivityBoard(message, usersList) {
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
     await updateAdminMessage(newMember.guild);
+});
+
+// Nasłuchiwanie wyłączenia lub restartu procesów Node.js
+process.on('SIGINT', async () => {
+    await sendLog('🔴 **Bot został wyłączony / zrestartowany!**');
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    await sendLog('🔴 **Bot został wyłączony / zrestartowany!**');
+    process.exit(0);
 });
 
 client.login('MTU0ODYzNjU3NTEyMDc1MjY4MQ.GMbXfK.dEs0hkRP1k0oDVIZKz1kck0nnMbYJmAiaw64cU');
