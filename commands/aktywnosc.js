@@ -31,7 +31,7 @@ module.exports = {
         let descriptionText = `# <a:checkmark:1543969158646206475> Aktywność check\n## <a:top1:1548673656761352304> 1. Brak\n## <a:top2:1548673747983011891> 2. Brak\n## <a:top3:1548673801104138322> 3. Brak\n\n## <a:dot:1543969325155745812> Zareaguj emotką "<a:checkmark:1543969158646206475>" poniżej aby zaznaczyć aktywność.`;
 
         if (opis) {
-            descriptionText += `\n\nOpis: ${opis}`;
+            descriptionText += `\n\n### Opis: ${opis}`;
         }
 
         const embed = new EmbedBuilder()
@@ -42,7 +42,7 @@ module.exports = {
             });
 
         const sentMessage = await channel.send({
-            content: null,
+            content: '@everyone @here',
             embeds: [embed]
         });
 
