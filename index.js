@@ -41,7 +41,6 @@ async function sendLog(content) {
     }
 }
 
-// System sprawdzania zmodyfikowanych komend
 const versionsFilePath = path.join(__dirname, 'command-versions.json');
 let savedVersions = {};
 if (fs.existsSync(versionsFilePath)) {
@@ -59,13 +58,10 @@ const modifiedCommands = [];
 
 for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
-    const fileContent = fs.readFileSync(filePath, 'utf8');
-    
-    // Proste hashowanie kodu pliku (liczba znaków + długość) lub mtime
     const stats = fs.statSync(filePath);
     currentVersions[file] = stats.mtimeMs;
 
-    if (savedVersions[file] !== stats.mtimeMs) {
+    if (savedVersions[file] !== undefined && savedVersions[file] !== stats.mtimeMs) {
         modifiedCommands.push(file.replace('.js', ''));
     }
 
@@ -76,7 +72,6 @@ for (const file of commandFiles) {
     }
 }
 
-// Zapisz nowe wersje
 fs.writeFileSync(versionsFilePath, JSON.stringify(currentVersions, null, 2));
 
 async function updateAdminMessage(guild) {
@@ -111,7 +106,7 @@ client.once('ready', async () => {
             const list = modifiedCommands.map(c => `\`/${c}\``).join(', ');
             await sendLog(`Wykryto zmianę kodu w komendach: ${list}`);
         }
-    }, 1000);
+    }, 2000);
 
     const guild = client.guilds.cache.first();
     if (guild) {
@@ -231,13 +226,11 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     await updateAdminMessage(newMember.guild);
 });
 
-process.on('SIGINT', async () => {
-    await sendLog('Bot został wyłączony / zrestartowany.');
+process.on('SIGINT', () => {
     process.exit(0);
 });
 
-process.on('SIGTERM', async () => {
-    await sendLog('Bot został wyłączony / zrestartowany.');
+process.on('SIGTERM', () => {
     process.exit(0);
 });
 
