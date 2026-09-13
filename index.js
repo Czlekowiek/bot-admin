@@ -16,7 +16,8 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.GuildMessages
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent // Wymagane do czytania treści wiadomości (komenda !test)
     ],
     partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
@@ -129,6 +130,21 @@ client.once('ready', async () => {
 // Obsługa powitania przez moduł z utils
 client.on('guildMemberAdd', async member => {
     await sendWelcomeMessage(member);
+});
+
+// Dodana obsługa komendy testowej !test
+client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
+
+    if (message.content === '!test') {
+        await message.reply('Generuję testowy banner powitalny...');
+        
+        // Wywołanie z Twoimi danymi testowymi
+        await sendWelcomeMessage(message.member, {
+            username: 'Testowa wiadomosc',
+            avatarURL: 'https://i.pinimg.com/236x/02/59/e0/0259e0a197959763a4a8b3d1e6e660a2.jpg'
+        });
+    }
 });
 
 client.on('interactionCreate', async interaction => {
