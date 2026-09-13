@@ -19,8 +19,8 @@ async function sendWelcomeMessage(member) {
         const canvas = Canvas.createCanvas(1200, 633);
         const ctx = canvas.getContext('2d');
 
-        // 2. Wczytanie i narysowanie tła z Twojego linku
-        const background = await Canvas.loadImage('https://iili.io/nqNN92a.png');
+        // 2. Wczytanie i narysowanie tła z nowego linku
+        const background = await Canvas.loadImage('https://iili.io/nqND2ls.png');
         ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
 
         // 3. Koordynaty awatara (środek koła X: 600, Y: 153)
@@ -51,11 +51,14 @@ async function sendWelcomeMessage(member) {
         ctx.drawImage(avatar, centerX - avatarRadius, centerY - avatarRadius, avatarRadius * 2, avatarRadius * 2);
         ctx.restore();
 
-        // 6. Rysowanie nazwy użytkownika (wyśrodkowana, biała, odpowiednio duża i pogrubiona Poppins)
+        // 6. Rysowanie nazwy użytkownika (Wymuszenie czystego, grubego sans-serif, kolor biały, wyśrodkowanie)
+        ctx.save();
         ctx.textAlign = 'center';
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 46px "Poppins", sans-serif';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 52px sans-serif'; // Bezpośrednie użycie sans-serif zapobiega błędom braku czcionki w chmurze
         ctx.fillText(username, 606, 355);
+        ctx.restore();
 
         // Generowanie załącznika i wysyłka
         const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome-banner.png' });
