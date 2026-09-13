@@ -16,17 +16,20 @@ const client = new Client({
 
 const CHANNEL_ID = '1548638166389366834';
 
+// Pełna lista ról z Twojego wzoru wraz z dedykowanymi emoji
 const ROLES_TO_TRACK = [
-    { id: '1548633496220864624', name: 'Właściciel' },
-    { id: '1548633906969051156', name: 'Technik' },
-    { id: '1548633531482247188', name: 'Admin' },
-    { id: '1548633569814122617', name: 'Rola 4' }
+    { id: '1542127037202825326', name: '<:owner_gradient:1548652163272675452> Właściciel' },
+    { id: '1543676695377215629', name: '<:admin_darkpurple:1548650402503852032> Technik' },
+    { id: '1542127233093869701', name: '<:admin_yellow:1548649419434627246> Współwłaściciel' },
+    { id: '1542128389274472458', name: '<:admin_red:1548649297724047450> Admin' },
+    { id: '1542991925521420330', name: '<:admin_orange:1548649349834080327> Junior Admin' },
+    { id: '1542127336193785886', name: '<:admin_blue:1548649538389024768> Developer' },
+    { id: '1543996411350098010', name: '<:admin_turquoise:1548650090703491153> Zarząd Frakcji' }
 ];
 
 let targetMessage = null;
 
 async function generateEmbed(guild) {
-    // Pobiera świeżą listę wszystkich członków z serwera, żeby nikogo nie pominąć
     await guild.members.fetch().catch(() => {});
 
     let descriptionText = '';
@@ -35,11 +38,13 @@ async function generateEmbed(guild) {
         const role = await guild.roles.fetch(roleData.id).catch(() => null);
         
         let membersList = '<:arrow:1543977081233342494> Brak osób';
+        
         if (role && role.members.size > 0) {
+            // Każdy użytkownik ma osobną linię ze strzałką
             membersList = role.members.map(member => `<:arrow:1543977081233342494> <@${member.id}>`).join('\n');
         }
 
-        descriptionText += `## <a:dot:1543969325155745812> ${roleData.name}\n${membersList}\n\n`;
+        descriptionText += `## ${roleData.name}\n${membersList}\n\n`;
     }
 
     const embed = new EmbedBuilder()
