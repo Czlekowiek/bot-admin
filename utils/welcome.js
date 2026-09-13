@@ -70,27 +70,6 @@ async function sendWelcomeMessage(member) {
         const centerY = 153;
         const avatarRadius = 104;
 
-        // Czarne półprzezroczyste tło pod obwódką
-        ctx.save();
-
-        ctx.beginPath();
-        ctx.arc(
-            centerX,
-            centerY,
-            avatarRadius + 6,
-            0,
-            Math.PI * 2
-        );
-
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.fill();
-
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.stroke();
-
-        ctx.restore();
-
         // =========================================================
         // AVATAR UŻYTKOWNIKA
         // =========================================================
