@@ -16,7 +16,6 @@ const client = new Client({
 
 const CHANNEL_ID = '1548638166389366834';
 
-// Twoje role dopasowane do struktury (zgodnie z ID podanymi wcześniej)
 const ROLES_TO_TRACK = [
     { id: '1548633496220864624', name: 'Właściciel' },
     { id: '1548633906969051156', name: 'Technik' },
@@ -27,6 +26,9 @@ const ROLES_TO_TRACK = [
 let targetMessage = null;
 
 async function generateEmbed(guild) {
+    // Pobiera świeżą listę wszystkich członków z serwera, żeby nikogo nie pominąć
+    await guild.members.fetch().catch(() => {});
+
     let descriptionText = '';
 
     for (const roleData of ROLES_TO_TRACK) {
@@ -85,12 +87,7 @@ client.once('ready', async () => {
 });
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
-    const oldRoles = oldMember.roles.cache.size;
-    const newRoles = newMember.roles.cache.size;
-
-    if (oldRoles !== newRoles) {
-        await updateAdminMessage(newMember.guild);
-    }
+    await updateAdminMessage(newMember.guild);
 });
 
 client.login('MTU0ODYzNjU3NTEyMDc1MjY4MQ.GMbXfK.dEs0hkRP1k0oDVIZKz1kck0nnMbYJmAiaw64cU');
