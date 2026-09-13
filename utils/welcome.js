@@ -2,7 +2,7 @@ const { EmbedBuilder } = require('discord.js');
 
 async function sendWelcomeMessage(member) {
     try {
-        const WELCOME_CHANNEL_ID = '1542122742768210000';
+        const WELCOME_CHANNEL_ID = '1542121319263641682';
         const channel = await member.guild.channels.fetch(WELCOME_CHANNEL_ID).catch(() => null);
         if (!channel) return;
 
