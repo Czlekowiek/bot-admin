@@ -20,15 +20,15 @@ const CHANNEL_IDS = [
     '1542122713676644352'
 ];
 
-// Zaktualizowana lista ról uwzględniająca Moderatora i Junior Moderatora
+// Zaktualizowana lista ról z poprawionymi emoji dla Moderatora i Junior Moderatora
 const ROLES_TO_TRACK = [
     { id: '1542127037202825326', name: '<:owner_gradient:1548652163272675452> Właściciel' },
     { id: '1542127233093869701', name: '<:admin_yellow:1548649419434627246> Współwłaściciel' },
     { id: '1543676695377215629', name: '<:admin_darkpurple:1548650402503852032> Technik' },
     { id: '1542128389274472458', name: '<:admin_red:1548649297724047450> Admin' },
     { id: '1542991925521420330', name: '<:admin_orange:1548649349834080327> Junior Admin' },
-    { id: '1548662787071279145', name: '<:admin_lightgreen:1548663391491592295> Moderator' },
-    { id: '1548662868960870502', name: '<:admin_green:1548649490964025446> Junior Moderator' },
+    { id: '1548662787071279145', name: '<:admin_green:1548649490964025446> Moderator' },
+    { id: '1548662868960870502', name: '<:admin_lightgreen:1548663391491592295> Junior Moderator' },
     { id: '1542127336193785886', name: '<:admin_blue:1548649538389024768> Developer' },
     { id: '1543996411350098010', name: '<:admin_turquoise:1548650090703491153> Zarząd Frakcji' }
 ];
