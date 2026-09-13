@@ -146,7 +146,7 @@ async function sendWelcomeMessage(member) {
         // od problematycznego renderowania tekstu przez canvas.
         // =========================================================
 
-        const TEXT_Y = 360;
+        const TEXT_Y = 375;
         const FONT_SIZE = 100;
 
         /*
