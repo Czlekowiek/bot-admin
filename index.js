@@ -317,7 +317,7 @@ client.on(
 
         try {
 
-            await sendByeMessage(member);
+            await sendLeaveMessage(member);
 
         } catch (error) {
 
