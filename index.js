@@ -14,7 +14,11 @@ const client = new Client({
     ]
 });
 
-const CHANNEL_ID = '1548638166389366834';
+// Lista kanałów, na które bot wysyła i aktualizuje wiadomość
+const CHANNEL_IDS = [
+    '1548638166389366834',
+    '1542122713676644352'
+];
 
 // Pełna lista ról z Twojego wzoru wraz z dedykowanymi emoji
 const ROLES_TO_TRACK = [
@@ -27,7 +31,7 @@ const ROLES_TO_TRACK = [
     { id: '1543996411350098010', name: '<:admin_turquoise:1548650090703491153> Zarząd Frakcji' }
 ];
 
-let targetMessage = null;
+const targetMessages = {};
 
 async function generateEmbed(guild) {
     await guild.members.fetch().catch(() => {});
@@ -40,7 +44,6 @@ async function generateEmbed(guild) {
         let membersList = '<:arrow:1543977081233342494> Brak osób';
         
         if (role && role.members.size > 0) {
-            // Każdy użytkownik ma osobną linię ze strzałką
             membersList = role.members.map(member => `<:arrow:1543977081233342494> <@${member.id}>`).join('\n');
         }
 
@@ -60,24 +63,29 @@ async function generateEmbed(guild) {
 
 async function updateAdminMessage(guild) {
     try {
-        const channel = await guild.channels.fetch(CHANNEL_ID).catch(() => null);
-        if (!channel) return console.log('Nie znaleziono kanału!');
-
         const newEmbed = await generateEmbed(guild);
         const contentText = '# <:staff:1548644739237027902> Skład Administracji';
 
-        if (!targetMessage) {
-            const messages = await channel.messages.fetch({ limit: 10 });
-            targetMessage = messages.find(m => m.author.id === client.user.id);
-        }
+        for (const channelId of CHANNEL_IDS) {
+            const channel = await guild.channels.fetch(channelId).catch(() => null);
+            if (!channel) {
+                console.log(`Nie znaleziono kanału o ID: ${channelId}`);
+                continue;
+            }
 
-        if (targetMessage) {
-            await targetMessage.edit({ content: contentText, embeds: [newEmbed] });
-        } else {
-            targetMessage = await channel.send({ content: contentText, embeds: [newEmbed] });
+            if (!targetMessages[channelId]) {
+                const messages = await channel.messages.fetch({ limit: 10 });
+                targetMessages[channelId] = messages.find(m => m.author.id === client.user.id);
+            }
+
+            if (targetMessages[channelId]) {
+                await targetMessages[channelId].edit({ content: contentText, embeds: [newEmbed] });
+            } else {
+                targetMessages[channelId] = await channel.send({ content: contentText, embeds: [newEmbed] });
+            }
         }
         
-        console.log('Zaktualizowano listę administracji!');
+        console.log('Zaktualizowano listę administracji na wszystkich kanałach!');
     } catch (error) {
         console.error('Błąd podczas aktualizacji wiadomości:', error);
     }
