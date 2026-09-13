@@ -18,7 +18,7 @@ async function sendWelcomeMessage(member) {
         // Układ 1:1 jak na wzorze (Awatar u góry na środku, nick, a pod nim podtytuł)
         const card = await new WelcomeBuilder({
             fontDefault: 'Inter',
-            backgroundImgURL: 'https://images.unsplash.com/photo-1759222213_darlowo_z_lotu-Aq5e0Pjf7wSo.jpg', // Tutaj możesz też wgrać własny link do pliku
+            backgroundImgURL: 'https://dreamtours.pl/img/uploads/1759222213_darlowo_z_lotu-Aq5e0Pjf7wSo.jpg',
             avatarImgURL: avatarURL,
             avatarBorderColor: '#ffffff',
             avatarBackgroundColor: '#1e1e1e',
