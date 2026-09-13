@@ -136,19 +136,17 @@ async function sendLeaveMessage(member) {
         }
 
         // =========================================================
-        // TEKST NA OBRAZKU
+        // TEKST NA OBRAZKU (DYNAMICZNE SKALOWANIE I POZYCJA)
         // =========================================================
 
         const NORMAL_FONT_SIZE = 85;
-
-        // Maksymalna szerokość nazwy
         const MAX_TEXT_WIDTH = 850;
 
-        // Normalny tekst przesunięty o 2 px do góry
+        // Normalny tekst
         const NORMAL_TEXT_Y = 373;
 
-        // Długie nazwy są lekko wyżej
-        const LONG_TEXT_Y = 369;
+        // Długie nazwy (wyższa pozycja zapobiegająca wychodzeniu poza ramę)
+        const LONG_TEXT_Y = 355; 
 
         // =========================================================
         // ESCAPE ZNAKÓW DLA SVG
@@ -178,8 +176,7 @@ async function sendLeaveMessage(member) {
 
         const measureCtx = measureCanvas.getContext('2d');
 
-        measureCtx.font =
-            `900 ${fontSize}px "DejaVu Sans"`;
+        measureCtx.font = `900 ${fontSize}px "DejaVu Sans"`;
 
         while (
             measureCtx.measureText(username).width > MAX_TEXT_WIDTH &&
@@ -187,8 +184,7 @@ async function sendLeaveMessage(member) {
         ) {
             fontSize -= 2;
 
-            measureCtx.font =
-                `900 ${fontSize}px "DejaVu Sans"`;
+            measureCtx.font = `900 ${fontSize}px "DejaVu Sans"`;
         }
 
         // =========================================================
