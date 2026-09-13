@@ -19,7 +19,7 @@ async function sendWelcomeMessage(member) {
         const canvas = Canvas.createCanvas(1200, 633);
         const ctx = canvas.getContext('2d');
 
-        // 2. Wczytanie i narysowanie tła z nowego linku
+        // 2. Wczytanie i narysowanie tła
         const background = await Canvas.loadImage('https://iili.io/nqND2ls.png');
         ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
 
@@ -51,12 +51,12 @@ async function sendWelcomeMessage(member) {
         ctx.drawImage(avatar, centerX - avatarRadius, centerY - avatarRadius, avatarRadius * 2, avatarRadius * 2);
         ctx.restore();
 
-        // 6. Rysowanie nazwy użytkownika (używamy DejaVu Sans, która zadziała po dodaniu Aptfile)
+        // 6. Rysowanie nazwy użytkownika (Zabezpieczone przed awarią czcionki - jawny rozmiar i biały kolor)
         ctx.save();
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 46px "DejaVu Sans", sans-serif';
+        ctx.font = '700 44px Arial, sans-serif'; // Użycie bezpiecznego Arial zamiast Poppins, żeby Render na pewno to odczytał
         ctx.fillText(username, 606, 355);
         ctx.restore();
 
