@@ -5,10 +5,6 @@ async function sendWelcomeMessage(member) {
     try {
         const WELCOME_CHANNEL_ID = '1542121319263641682';
 
-        // ==========================================
-        // KANAŁ POWITALNY
-        // ==========================================
-
         const channel = await member.guild.channels
             .fetch(WELCOME_CHANNEL_ID)
             .catch(() => null);
@@ -17,10 +13,6 @@ async function sendWelcomeMessage(member) {
             console.error('❌ Nie znaleziono kanału powitalnego.');
             return;
         }
-
-        // ==========================================
-        // INFORMACJE O UŻYTKOWNIKU
-        // ==========================================
 
         const username = member.user.username;
         const serverName = member.guild.name;
@@ -52,17 +44,11 @@ async function sendWelcomeMessage(member) {
         const background = await Canvas
             .loadImage('https://iili.io/nqND2ls.png')
             .catch((error) => {
-                console.error(
-                    '❌ Nie udało się pobrać obrazka tła:',
-                    error
-                );
-
+                console.error('❌ Błąd tła:', error);
                 return null;
             });
 
-        if (!background) {
-            return;
-        }
+        if (!background) return;
 
         ctx.drawImage(
             background,
@@ -73,7 +59,7 @@ async function sendWelcomeMessage(member) {
         );
 
         // ==========================================
-        // AVATAR - OBRAMOWANIE
+        // AVATAR
         // ==========================================
 
         const avatarX = 600;
@@ -110,11 +96,7 @@ async function sendWelcomeMessage(member) {
         const avatar = await Canvas
             .loadImage(avatarURL)
             .catch((error) => {
-                console.error(
-                    '❌ Nie udało się pobrać avatara:',
-                    error
-                );
-
+                console.error('❌ Błąd avatara:', error);
                 return null;
             });
 
@@ -147,18 +129,10 @@ async function sendWelcomeMessage(member) {
         }
 
         // ==========================================
-        // NAZWA UŻYTKOWNIKA
+        // TEKST
         // ==========================================
 
         ctx.save();
-
-        /*
-         * Nie używamy bezpośrednio 80px,
-         * ponieważ na Render/node-canvas wcześniej
-         * pojawiał się problem z rozmiarem tekstu.
-         *
-         * Zamiast tego używamy 10px i skalujemy Canvas.
-         */
 
         const baseFontSize = 10;
         let targetFontSize = 80;
@@ -168,22 +142,15 @@ async function sendWelcomeMessage(member) {
         // Font
         ctx.font = `bold ${baseFontSize}px "DejaVu Sans"`;
 
-        // Szerokość tekstu
         const baseTextWidth = ctx.measureText(username).width;
 
-        // Skala
         let scale = targetFontSize / baseFontSize;
 
-        // Docelowa szerokość
         let finalTextWidth = baseTextWidth * scale;
 
-        // Jeżeli nick jest za długi,
-        // automatycznie zmniejszamy tekst
         if (finalTextWidth > maxWidth) {
             scale = maxWidth / baseTextWidth;
-
             targetFontSize = baseFontSize * scale;
-
             finalTextWidth = maxWidth;
         }
 
@@ -192,16 +159,13 @@ async function sendWelcomeMessage(member) {
         // ==========================================
 
         const centerX = 600;
-
-        // Ta pozycja jest już według Ciebie dobra
         const textY = 375;
 
-        // Przeliczenie przez skalę
         const scaledCenterX = centerX / scale;
         const scaledTextY = textY / scale;
 
         // ==========================================
-        // SKALOWANIE
+        // SKALA
         // ==========================================
 
         ctx.scale(scale, scale);
@@ -212,31 +176,48 @@ async function sendWelcomeMessage(member) {
 
         ctx.font = `bold ${baseFontSize}px "DejaVu Sans"`;
 
-        // ==========================================
-        // CENTROWANIE
-        // ==========================================
-
         const textX =
             scaledCenterX - (baseTextWidth / 2);
 
         // ==========================================
-        // RESET STANU CANVAS
+        // RESET
         // ==========================================
 
         ctx.globalAlpha = 1;
 
         ctx.globalCompositeOperation = 'source-over';
 
-        ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
+        ctx.shadowColor = 'rgba(0,0,0,0)';
 
         // ==========================================
-        // BIAŁY TEKST
+        // TEST KOLORU
         // ==========================================
 
-        ctx.fillStyle = 'rgb(255, 255, 255)';
+        /*
+         * Najpierw rysujemy MAŁY BIAŁY KWADRAT
+         * w miejscu tekstu.
+         *
+         * Jeżeli kwadrat jest biały,
+         * Canvas poprawnie obsługuje kolor.
+         */
+
+        ctx.fillStyle = '#FFFFFF';
+
+        ctx.fillRect(
+            scaledCenterX - 5,
+            scaledTextY - 10,
+            10,
+            10
+        );
+
+        // ==========================================
+        // TEKST
+        // ==========================================
+
+        ctx.fillStyle = '#FFFFFF';
+
+        ctx.globalCompositeOperation = 'source-over';
 
         ctx.fillText(
             username,
@@ -247,7 +228,7 @@ async function sendWelcomeMessage(member) {
         ctx.restore();
 
         // ==========================================
-        // LOGI
+        // DEBUG
         // ==========================================
 
         console.log('======================================');
@@ -255,15 +236,15 @@ async function sendWelcomeMessage(member) {
         console.log('👤 Username:', username);
         console.log('📏 Bazowa szerokość:', baseTextWidth);
         console.log('📏 Docelowa szerokość:', finalTextWidth);
-        console.log('🔠 Docelowy rozmiar:', targetFontSize);
+        console.log('🔠 Rozmiar:', targetFontSize);
         console.log('🔎 Skala:', scale);
-        console.log('📍 Środek X:', centerX);
-        console.log('📍 Pozycja Y:', textY);
-        console.log('🎨 Wypełnienie: rgb(255, 255, 255)');
+        console.log('📍 X:', centerX);
+        console.log('📍 Y:', textY);
+        console.log('🎨 fillStyle:', ctx.fillStyle);
         console.log('======================================');
 
         // ==========================================
-        // TWORZENIE ZAŁĄCZNIKA
+        // ZAŁĄCZNIK
         // ==========================================
 
         const attachment = new AttachmentBuilder(
@@ -304,7 +285,7 @@ async function sendWelcomeMessage(member) {
 
     } catch (error) {
         console.error(
-            '❌ Błąd podczas generowania i wysyłania powitania:',
+            '❌ Błąd podczas generowania powitania:',
             error
         );
     }
