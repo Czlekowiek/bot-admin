@@ -129,7 +129,6 @@ async function updateActivityBoard(message) {
     const embed = message.embeds[0];
     const description = embed.description;
 
-    // Wyciągamy opcjonalny opis jeśli istniał
     const opisMatch = description.split(/Opis: /);
     const activityDescription = opisMatch[1] ? opisMatch[1] : null;
 
@@ -137,7 +136,13 @@ async function updateActivityBoard(message) {
     if (!reaction) return;
 
     const users = await reaction.users.fetch({ limit: 100 });
-    const humanUsers = Array.from(users.values()).filter(u => !u.bot);
+    
+    const humanUsers = [];
+    for (const [userId, user] of users) {
+        if (!user.bot) {
+            humanUsers.push(user);
+        }
+    }
 
     const top1 = humanUsers[0] ? `<@${humanUsers[0].id}>` : 'Brak';
     const top2 = humanUsers[1] ? `<@${humanUsers[1].id}>` : 'Brak';
