@@ -76,6 +76,7 @@ async function sendWelcomeMessage(member) {
         const avatarY = 153;
         const avatarRadius = 104;
 
+        // Obramowanie avatara
         ctx.save();
 
         ctx.beginPath();
@@ -88,6 +89,8 @@ async function sendWelcomeMessage(member) {
             Math.PI * 2
         );
 
+        ctx.closePath();
+
         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
         ctx.fill();
 
@@ -96,6 +99,10 @@ async function sendWelcomeMessage(member) {
         ctx.stroke();
 
         ctx.restore();
+
+        // ==========================================
+        // AVATAR
+        // ==========================================
 
         const avatar = await Canvas
             .loadImage(avatarURL)
@@ -117,6 +124,7 @@ async function sendWelcomeMessage(member) {
                 Math.PI * 2
             );
 
+            ctx.closePath();
             ctx.clip();
 
             ctx.drawImage(
@@ -131,57 +139,80 @@ async function sendWelcomeMessage(member) {
         }
 
         // ==========================================
-        // TEKST USERNAME
+        // NAZWA UŻYTKOWNIKA
         // ==========================================
+
+        /*
+         * WAŻNE:
+         *
+         * Nie polegamy tutaj na tym, że canvas poprawnie
+         * interpretuje "80px".
+         *
+         * Używamy bazowej czcionki 10px i skalujemy
+         * cały kontekst Canvas.
+         *
+         * Dzięki temu rozmiar tekstu jest wymuszony
+         * przez transformację.
+         */
 
         ctx.save();
 
-        // Ustawiamy DUŻĄ czcionkę.
-        // Używamy Liberation Sans, który instalujemy
-        // przez Aptfile na Renderze.
+        // Bazowy rozmiar fontu.
+        // Na node-canvas 10px jest bezpiecznie interpretowane.
+        const baseFontSize = 10;
 
-        let fontSize = 80;
+        // Docelowy rozmiar tekstu
+        let targetFontSize = 80;
+
+        // Ustawiamy prosty font bez kombinowania
+        ctx.font = `bold ${baseFontSize}px Arial`;
+
+        // Szerokość tekstu przy 10px
+        const baseTextWidth = ctx.measureText(username).width;
+
+        // Maksymalna szerokość nicku
         const maxWidth = 850;
 
-        ctx.font = `bold ${fontSize}px "Liberation Sans"`;
+        // Wyliczamy skalę potrzebną do osiągnięcia 80px
+        let scale = targetFontSize / baseFontSize;
 
-        // Prawdziwa wartość ustawionego fontu
-        console.log('🔤 Canvas ctx.font:', ctx.font);
+        // Rzeczywista szerokość po przeskalowaniu
+        let finalTextWidth = baseTextWidth * scale;
 
-        let textWidth = ctx.measureText(username).width;
-
-        console.log('📏 Początkowa szerokość:', textWidth);
-
-        // Zmniejszanie tylko dla bardzo długich nicków
-        while (
-            textWidth > maxWidth &&
-            fontSize > 30
-        ) {
-            fontSize -= 2;
-
-            ctx.font = `bold ${fontSize}px "Liberation Sans"`;
-
-            textWidth = ctx.measureText(username).width;
+        // Jeśli nick jest zbyt długi,
+        // zmniejszamy go automatycznie
+        if (finalTextWidth > maxWidth) {
+            scale = maxWidth / baseTextWidth;
+            targetFontSize = baseFontSize * scale;
+            finalTextWidth = maxWidth;
         }
 
         // ==========================================
-        // RĘCZNE CENTROWANIE
+        // POZYCJA
         // ==========================================
 
         const centerX = 600;
-
-        const textX = centerX - (textWidth / 2);
-
         const textY = 355;
 
+        /*
+         * Ponieważ skalujemy od punktu 0,0,
+         * musimy podzielić pozycję X i Y przez skalę.
+         */
+
+        const scaledCenterX = centerX / scale;
+        const scaledTextY = textY / scale;
+
         // ==========================================
-        // BIAŁY KOLOR
+        // SKALOWANIE
+        // ==========================================
+
+        ctx.scale(scale, scale);
+
+        // ==========================================
+        // KOLOR
         // ==========================================
 
         ctx.fillStyle = '#FFFFFF';
-
-        // Usuwamy wszelkie ewentualne ustawienia
-        // wpływające na kolor.
 
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = 'source-over';
@@ -191,9 +222,15 @@ async function sendWelcomeMessage(member) {
         // ==========================================
 
         ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetX = 3;
-        ctx.shadowOffsetY = 3;
+        ctx.shadowBlur = 1.5;
+        ctx.shadowOffsetX = 0.5;
+        ctx.shadowOffsetY = 0.5;
+
+        // ==========================================
+        // RĘCZNE CENTROWANIE
+        // ==========================================
+
+        const textX = scaledCenterX - (baseTextWidth / 2);
 
         // ==========================================
         // RYSOWANIE
@@ -202,7 +239,7 @@ async function sendWelcomeMessage(member) {
         ctx.fillText(
             username,
             textX,
-            textY
+            scaledTextY
         );
 
         ctx.restore();
@@ -214,11 +251,13 @@ async function sendWelcomeMessage(member) {
         console.log('======================================');
         console.log('🖼️ WELCOME BANNER');
         console.log('👤 Username:', username);
-        console.log('🔤 RZECZYWISTY ctx.font:', ctx.font);
-        console.log('📏 Text width:', textWidth);
-        console.log('📍 Text X:', textX);
-        console.log('📍 Text Y:', textY);
-        console.log('🎨 Text color: #FFFFFF');
+        console.log('📏 Bazowa szerokość:', baseTextWidth);
+        console.log('📏 Docelowa szerokość:', finalTextWidth);
+        console.log('🔠 Docelowy rozmiar:', targetFontSize);
+        console.log('🔎 Skala:', scale);
+        console.log('📍 Środek X:', centerX);
+        console.log('📍 Pozycja Y:', textY);
+        console.log('🎨 Kolor: #FFFFFF');
         console.log('======================================');
 
         // ==========================================
