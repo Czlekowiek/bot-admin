@@ -20,7 +20,7 @@ const CHANNEL_IDS = [
     '1542122713676644352'
 ];
 
-// Pełna lista ról wraz z dedykowanymi emoji
+// Lista ról: Technik pod Właścicielem, a Współwłaściciel pod Technikiem
 const ROLES_TO_TRACK = [
     { id: '1542127037202825326', name: '<:owner_gradient:1548652163272675452> Właściciel' },
     { id: '1543676695377215629', name: '<:admin_darkpurple:1548650402503852032> Technik' },
@@ -34,7 +34,7 @@ const ROLES_TO_TRACK = [
 async function generateEmbed(guild) {
     await guild.members.fetch().catch(() => {});
 
-    let descriptionText = '';
+    let descriptionText = '# <:staff:1548644739237027902> Skład administracji serwera\n';
 
     for (const roleData of ROLES_TO_TRACK) {
         const role = await guild.roles.fetch(roleData.id).catch(() => null);
@@ -45,7 +45,7 @@ async function generateEmbed(guild) {
             membersList = role.members.map(member => `<:arrow:1543977081233342494> <@${member.id}>`).join('\n');
         }
 
-        descriptionText += `## ${roleData.name}\n${membersList}\n\n`;
+        descriptionText += `## ${roleData.name}\n${membersList}\n`;
     }
 
     // Pobranie aktualnego czasu w czytelnym formacie PL
@@ -60,7 +60,6 @@ async function generateEmbed(guild) {
     });
 
     const embed = new EmbedBuilder()
-        .setTitle('<:staff:1548644739237027902> Skład administracji serwera')
         .setDescription(descriptionText.trim())
         .setColor(16764416)
         .setFooter({
@@ -86,7 +85,6 @@ async function updateAdminMessage(guild) {
             let botMessage = messages ? messages.find(m => m.author.id === client.user.id) : null;
 
             if (botMessage) {
-                // Wysyłamy pustą treść (content: null lub usunięty), żeby nad embedem nie było żadnego tekstu
                 await botMessage.edit({ content: null, embeds: [newEmbed] });
             } else {
                 await channel.send({ embeds: [newEmbed] });
