@@ -15,28 +15,28 @@ async function sendWelcomeMessage(member) {
         const username = member.user.username;
         const serverName = member.guild.name;
 
-        // Samodzielne generowanie banera graficznego przez bota
+        // Układ 1:1 jak na wzorze (Awatar u góry na środku, nick, a pod nim podtytuł)
         const card = await new WelcomeBuilder({
             fontDefault: 'Inter',
-            backgroundImgURL: 'https://images.unsplash.com/photo-1518684079-3c830dcef090?q=80&w=1000&auto=format&fit=crop',
+            backgroundImgURL: 'https://images.unsplash.com/photo-1759222213_darlowo_z_lotu-Aq5e0Pjf7wSo.jpg', // Tutaj możesz też wgrać własny link do pliku
             avatarImgURL: avatarURL,
             avatarBorderColor: '#ffffff',
             avatarBackgroundColor: '#1e1e1e',
-            overlayOpacity: 0.4,
+            overlayOpacity: 0.5, // Przyciemnienie tła, aby tekst i awatar były idealnie widoczne
             mainText: {
-                content: serverName,
+                content: username, // Duży napis na środku (nazwa użytkownika jak na wzorze)
                 color: '#ffffff',
-                size: 42
+                size: 40
             },
             nicknameText: {
-                content: username,
-                color: '#ffaa00',
-                size: 36
+                content: '', // Zostawiamy puste, żeby niedublować
+                color: '#ffffff',
+                size: 0
             },
             secondText: {
-                content: `Jesteś naszym ${memberCount} członkiem!`,
-                color: '#dddddd',
-                size: 26
+                content: `${serverName} • Jesteś ${memberCount} członkiem`, // Mniejszy napis pod spodem
+                color: '#cccccc',
+                size: 22
             }
         }).build();
 
