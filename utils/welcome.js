@@ -56,9 +56,7 @@ async function sendWelcomeMessage(member) {
                 return null;
             });
 
-        if (!background) {
-            return;
-        }
+        if (!background) return;
 
         ctx.drawImage(
             background,
@@ -76,7 +74,6 @@ async function sendWelcomeMessage(member) {
         const avatarY = 153;
         const avatarRadius = 104;
 
-        // Obramowanie avatara
         ctx.save();
 
         ctx.beginPath();
@@ -99,10 +96,6 @@ async function sendWelcomeMessage(member) {
         ctx.stroke();
 
         ctx.restore();
-
-        // ==========================================
-        // AVATAR
-        // ==========================================
 
         const avatar = await Canvas
             .loadImage(avatarURL)
@@ -139,48 +132,33 @@ async function sendWelcomeMessage(member) {
         }
 
         // ==========================================
-        // NAZWA UŻYTKOWNIKA
+        // USERNAME
         // ==========================================
-
-        /*
-         * WAŻNE:
-         *
-         * Nie polegamy tutaj na tym, że canvas poprawnie
-         * interpretuje "80px".
-         *
-         * Używamy bazowej czcionki 10px i skalujemy
-         * cały kontekst Canvas.
-         *
-         * Dzięki temu rozmiar tekstu jest wymuszony
-         * przez transformację.
-         */
 
         ctx.save();
 
-        // Bazowy rozmiar fontu.
-        // Na node-canvas 10px jest bezpiecznie interpretowane.
+        /*
+         * Bazowy font 10px + skalowanie.
+         *
+         * Dzięki temu omijamy problem Render/node-canvas
+         * z nieprawidłowym rozmiarem fontu.
+         */
+
         const baseFontSize = 10;
 
-        // Docelowy rozmiar tekstu
         let targetFontSize = 80;
 
-        // Ustawiamy prosty font bez kombinowania
-        ctx.font = `bold ${baseFontSize}px Arial`;
-
-        // Szerokość tekstu przy 10px
-        const baseTextWidth = ctx.measureText(username).width;
-
-        // Maksymalna szerokość nicku
         const maxWidth = 850;
 
-        // Wyliczamy skalę potrzebną do osiągnięcia 80px
+        ctx.font = `bold ${baseFontSize}px "DejaVu Sans"`;
+
+        const baseTextWidth = ctx.measureText(username).width;
+
         let scale = targetFontSize / baseFontSize;
 
-        // Rzeczywista szerokość po przeskalowaniu
         let finalTextWidth = baseTextWidth * scale;
 
-        // Jeśli nick jest zbyt długi,
-        // zmniejszamy go automatycznie
+        // Automatyczne zmniejszanie bardzo długich nicków
         if (finalTextWidth > maxWidth) {
             scale = maxWidth / baseTextWidth;
             targetFontSize = baseFontSize * scale;
@@ -188,16 +166,19 @@ async function sendWelcomeMessage(member) {
         }
 
         // ==========================================
-        // POZYCJA
+        // POZYCJA TEKSTU
         // ==========================================
 
         const centerX = 600;
-        const textY = 355;
 
         /*
-         * Ponieważ skalujemy od punktu 0,0,
-         * musimy podzielić pozycję X i Y przez skalę.
+         * Było 355.
+         *
+         * Teraz przesuwamy tekst trochę NIŻEJ.
+         * Możesz później zmienić na 365 / 375 / 385.
          */
+
+        const textY = 375;
 
         const scaledCenterX = centerX / scale;
         const scaledTextY = textY / scale;
@@ -209,32 +190,52 @@ async function sendWelcomeMessage(member) {
         ctx.scale(scale, scale);
 
         // ==========================================
-        // KOLOR
+        // FONT
+        // ==========================================
+
+        ctx.font = `bold ${baseFontSize}px "DejaVu Sans"`;
+
+        // ==========================================
+        // CENTROWANIE
+        // ==========================================
+
+        const textX =
+            scaledCenterX - (baseTextWidth / 2);
+
+        // ==========================================
+        // WAŻNE:
+        // RESETUJEMY WSZYSTKO
+        // ==========================================
+
+        ctx.globalAlpha = 1;
+
+        ctx.globalCompositeOperation = 'source-over';
+
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+
+        // ==========================================
+        // CZARNY OBRYS
+        // ==========================================
+
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = 1.8;
+
+        ctx.strokeStyle = '#000000';
+
+        ctx.strokeText(
+            username,
+            textX,
+            scaledTextY
+        );
+
+        // ==========================================
+        // BIAŁE WYPEŁNIENIE
         // ==========================================
 
         ctx.fillStyle = '#FFFFFF';
-
-        ctx.globalAlpha = 1;
-        ctx.globalCompositeOperation = 'source-over';
-
-        // ==========================================
-        // CIEŃ
-        // ==========================================
-
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-        ctx.shadowBlur = 1.5;
-        ctx.shadowOffsetX = 0.5;
-        ctx.shadowOffsetY = 0.5;
-
-        // ==========================================
-        // RĘCZNE CENTROWANIE
-        // ==========================================
-
-        const textX = scaledCenterX - (baseTextWidth / 2);
-
-        // ==========================================
-        // RYSOWANIE
-        // ==========================================
 
         ctx.fillText(
             username,
@@ -257,11 +258,12 @@ async function sendWelcomeMessage(member) {
         console.log('🔎 Skala:', scale);
         console.log('📍 Środek X:', centerX);
         console.log('📍 Pozycja Y:', textY);
-        console.log('🎨 Kolor: #FFFFFF');
+        console.log('🎨 Wypełnienie: #FFFFFF');
+        console.log('🎨 Obramowanie: #000000');
         console.log('======================================');
 
         // ==========================================
-        // OBRAZ
+        // PNG
         // ==========================================
 
         const attachment = new AttachmentBuilder(
