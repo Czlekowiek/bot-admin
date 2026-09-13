@@ -9,6 +9,6 @@ module.exports = {
         const latency = sent.createdTimestamp - interaction.createdTimestamp;
         const apiPing = interaction.client.ws.ping;
 
-        await interaction.editReply(`Pong! 🏓\nOpóźnienie wiadomości: **${latency}ms**\nOpóźnienie API Discorda: **${apiPing}ms**`);
+        await interaction.editReply(`Opóźnienie wiadomości: **${latency}ms**\nOpóźnienie API Discorda: **${apiPing}ms**`);
     },
 };
