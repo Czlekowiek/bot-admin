@@ -68,7 +68,7 @@ async function generateEmbed(guild) {
         .setColor(16764416)
         .setFooter({
             text: `Stworzone przez @czlekowiek • Ostatnia aktualizacja: ${formattedTime}`,
-            icon_url: 'https://cdn.discordapp.com/attachments/1548638166389366834/1548644226399600680/czlekowiek-avatar-1024.png'
+            icon_url: 'https://cdn.discordapp.com/attachments/1548632923928797216/1548662139663818812/czlekowiek-avatar-1024.png?ex=6aa7df82&is=6aa68e02&hm=b8fbe435ed3fd7f1e9f544795cb3ed4b486f1f03a622ea1d918c90dc48025e7f&'
         });
 
     return embed;
