@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, AttachmentBuilder } = require('discord.js');
 const http = require('http');
 
 const server = http.createServer((req, res) => {
@@ -20,7 +20,7 @@ const CHANNEL_IDS = [
     '1542122713676644352'
 ];
 
-// Ostateczna kolejność: Właściciel -> Współwłaściciel -> Technik -> reszta
+// Ostateczna kolejność ról
 const ROLES_TO_TRACK = [
     { id: '1542127037202825326', name: '<:owner_gradient:1548652163272675452> Właściciel' },
     { id: '1542127233093869701', name: '<:admin_yellow:1548649419434627246> Współwłaściciel' },
@@ -31,21 +31,26 @@ const ROLES_TO_TRACK = [
     { id: '1543996411350098010', name: '<:admin_turquoise:1548650090703491153> Zarząd Frakcji' }
 ];
 
-async function generateEmbed(guild) {
-    await guild.members.fetch().catch(() => {});
+async function generateEmbedAndFiles() {
+    const guild = client.guilds.cache.first();
+    if (guild) {
+        await guild.members.fetch().catch(() => {});
+    }
 
     let descriptionText = '# <:staff:1548644739237027902> Skład administracji serwera\n';
 
-    for (const roleData of ROLES_TO_TRACK) {
-        const role = await guild.roles.fetch(roleData.id).catch(() => null);
-        
-        let membersList = '<:arrow:1543977081233342494> Brak osób';
-        
-        if (role && role.members.size > 0) {
-            membersList = role.members.map(member => `<:arrow:1543977081233342494> <@${member.id}>`).join('\n');
-        }
+    if (guild) {
+        for (const roleData of ROLES_TO_TRACK) {
+            const role = await guild.roles.fetch(roleData.id).catch(() => null);
+            
+            let membersList = '<:arrow:1543977081233342494> Brak osób';
+            
+            if (role && role.members.size > 0) {
+                membersList = role.members.map(member => `<:arrow:1543977081233342494> <@${member.id}>`).join('\n');
+            }
 
-        descriptionText += `## ${roleData.name}\n${membersList}\n`;
+            descriptionText += `## ${roleData.name}\n${membersList}\n`;
+        }
     }
 
     // Pobranie aktualnego czasu w czytelnym formacie PL
@@ -59,20 +64,23 @@ async function generateEmbed(guild) {
         second: '2-digit'
     });
 
+    // Tworzenie załącznika z bezpośredniego linku graficznego
+    const file = new AttachmentBuilder('https://cdn.discordapp.com/attachments/1548638166389366834/1548644226399600680/czlekowiek-avatar-1024.png', { name: 'avatar.png' });
+
     const embed = new EmbedBuilder()
         .setDescription(descriptionText.trim())
         .setColor(16764416)
         .setFooter({
             text: `Stworzone przez @czlekowiek • Ostatnia aktualizacja: ${formattedTime}`,
-            icon_url: 'https://cdn.discordapp.com/attachments/1548638166389366834/1548644226399600680/czlekowiek-avatar-1024.png'
+            icon_url: 'attachment://avatar.png' // Odwołanie do lokalnie załączonego pliku
         });
 
-    return embed;
+    return { embeds: [embed], files: [file] };
 }
 
 async function updateAdminMessage(guild) {
     try {
-        const newEmbed = await generateEmbed(guild);
+        const messagePayload = await generateEmbedAndFiles();
 
         for (const channelId of CHANNEL_IDS) {
             const channel = await guild.channels.fetch(channelId).catch(() => null);
@@ -85,9 +93,9 @@ async function updateAdminMessage(guild) {
             let botMessage = messages ? messages.find(m => m.author.id === client.user.id) : null;
 
             if (botMessage) {
-                await botMessage.edit({ content: null, embeds: [newEmbed] });
+                await botMessage.edit({ content: null, embeds: messagePayload.embeds, files: messagePayload.files });
             } else {
-                await channel.send({ embeds: [newEmbed] });
+                await channel.send({ embeds: messagePayload.embeds, files: messagePayload.files });
             }
         }
         
