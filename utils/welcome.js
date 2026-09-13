@@ -125,8 +125,34 @@ async function sendWelcomeMessage(member) {
         // od problematycznego renderowania tekstu przez canvas.
         // =========================================================
 
-        const TEXT_Y = 375;
-        const FONT_SIZE = 85;
+const TEXT_Y = 375;
+
+// Normalny rozmiar tekstu
+const NORMAL_FONT_SIZE = 85;
+
+// Maksymalna szerokość nicku na banerze
+const MAX_TEXT_WIDTH = 850;
+
+// Minimalny rozmiar dla bardzo długich nicków
+const MIN_FONT_SIZE = 40;
+
+// Szacowanie szerokości tekstu.
+// DejaVu Sans przy font-weight 900 jest mniej więcej
+// proporcjonalny do rozmiaru czcionki.
+const estimatedWidthAt85 = username.length * 48;
+
+let FONT_SIZE = NORMAL_FONT_SIZE;
+
+if (estimatedWidthAt85 > MAX_TEXT_WIDTH) {
+    FONT_SIZE = Math.floor(
+        NORMAL_FONT_SIZE * MAX_TEXT_WIDTH / estimatedWidthAt85
+    );
+
+    if (FONT_SIZE < MIN_FONT_SIZE) {
+        FONT_SIZE = MIN_FONT_SIZE;
+    }
+}
+
 
         /*
          * Escape znaków specjalnych dla SVG.
