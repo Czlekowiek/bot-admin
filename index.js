@@ -16,12 +16,12 @@ const client = new Client({
 
 const CHANNEL_ID = '1548638166389366834';
 
-// Role, które bot ma sprawdzać (ID roli oraz jej nazwa wyświetlana w embedzie)
+// Twoje role dopasowane do struktury (zgodnie z ID podanymi wcześniej)
 const ROLES_TO_TRACK = [
     { id: '1548633496220864624', name: 'Właściciel' },
     { id: '1548633906969051156', name: 'Technik' },
     { id: '1548633531482247188', name: 'Admin' },
-    { id: '1548633569814122617', name: 'Rola 4' } // Jeśli masz czwartą rolę, dopisz jej ID
+    { id: '1548633569814122617', name: 'Rola 4' }
 ];
 
 let targetMessage = null;
@@ -34,11 +34,10 @@ async function generateEmbed(guild) {
         
         let membersList = '<:arrow:1543977081233342494> Brak osób';
         if (role && role.members.size > 0) {
-            // Pobiera użytkowników z danej roli i robi z nich wzmianki rozdzielone nową linią
             membersList = role.members.map(member => `<:arrow:1543977081233342494> <@${member.id}>`).join('\n');
         }
 
-        descriptionText += `<a:dot:1543969325155745812> ${roleData.name}\n${membersList}\n\n`;
+        descriptionText += `## <a:dot:1543969325155745812> ${roleData.name}\n${membersList}\n\n`;
     }
 
     const embed = new EmbedBuilder()
