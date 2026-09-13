@@ -1,5 +1,5 @@
 const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
-const { WelcomeBuilder } = require('discord-card-canvas');
+const Canvas = require('canvas');
 
 async function sendWelcomeMessage(member) {
     try {
@@ -15,33 +15,55 @@ async function sendWelcomeMessage(member) {
         const username = member.user.username;
         const serverName = member.guild.name;
 
-        // Dokładne dopasowanie czcionki, brak licznika na banerze i prawidłowa nazwa serwera
-        const card = await new WelcomeBuilder({
-            fontDefault: 'Arial',
-            backgroundImgURL: 'https://dreamtours.pl/img/uploads/1759222213_darlowo_z_lotu-Aq5e0Pjf7wSo.jpg',
-            avatarImgURL: avatarURL,
-            avatarBorderColor: '#ffffff',
-            avatarBackgroundColor: '#1e1e1e',
-            blur: 2,
-            opacity: 0.6,
-            rounded: true,
-            mainText: {
-                content: username,
-                color: '#ffffff',
-                size: 40
-            },
-            nicknameText: {
-                content: '',
-                size: 0
-            },
-            secondText: {
-                content: 'Polskie Drogi Roleplay',
-                color: '#b0b0b0',
-                size: 22
-            }
-        }).build();
+        // 1. Tworzenie płótna 1200x633 px
+        const canvas = Canvas.createCanvas(1200, 633);
+        const ctx = canvas.getContext('2d');
 
-        const attachment = new AttachmentBuilder(card.toBuffer(), { name: 'welcome-banner.png' });
+        // 2. Wczytanie i narysowanie tła z Twojego linku
+        const background = await Canvas.loadImage('https://iili.io/nqNN92a.png');
+        ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+
+        // 3. Koordynaty awatara wyliczone z Canvy (środek koła X: 600, Y: 153)
+        const centerX = 600;
+        const centerY = 153;
+        const avatarRadius = 104; // Promień dopasowany do otworu pod awatar
+
+        // 4. Rysowanie delikatnego tła/obramówki pod awatarem (tworzy obwódkę)
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, avatarRadius + 6, 0, Math.PI * 2, true);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+        ctx.restore();
+
+        // 5. Właściwy awatar użytkownika wycięty w koło
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, avatarRadius, 0, Math.PI * 2, true);
+        ctx.closePath();
+        ctx.clip();
+
+        const avatar = await Canvas.loadImage(avatarURL);
+        ctx.drawImage(avatar, centerX - avatarRadius, centerY - avatarRadius, avatarRadius * 2, avatarRadius * 2);
+        ctx.restore();
+
+        // 6. Rysowanie nazwy użytkownika (Pogrubiony Poppins)
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 42px "Poppins", sans-serif';
+        ctx.fillText(username, 606, 355);
+
+        // 7. Rysowanie statycznego napisu "Polskie Drogi Roleplay" (Pogrubiony Poppins)
+        ctx.fillStyle = '#d0d0d0';
+        ctx.font = 'bold 22px "Poppins", sans-serif';
+        ctx.fillText('Polskie Drogi Roleplay', 606, 395);
+
+        // Generowanie załącznika i wysyłka
+        const attachment = new AttachmentBuilder(canvas.toBuffer(), { name: 'welcome-banner.png' });
 
         const embed = new EmbedBuilder()
             .setColor(16764416)
