@@ -292,21 +292,23 @@ async function sendWelcomeMessage(member) {
             }
         );
 
-        // =========================================================
-        // EMBED
-        // =========================================================
+// =========================================================
+// EMBED
+// =========================================================
 
-        const embed = new EmbedBuilder()
-            .setColor(16764416)
-            .setDescription(
-                `### ${username}\n\n` +
-                `Cześć **${username}**! Witaj na **${serverName}**!\n` +
-                `Jesteś naszym **${memberCount}** członkiem. Miłego pobytu!`
-            )
-            .setImage('attachment://welcome-banner.png')
-            .setFooter({
-                text: `Data utworzenia konta: ${formattedDate}`
-            });
+const displayName = member.displayName;
+
+const embed = new EmbedBuilder()
+    .setColor(16764416)
+    .setDescription(
+        `### ${displayName}\n\n` +
+        `Cześć **${displayName}**! Witaj na **${serverName}**!\n` +
+        `Jesteś naszym **${memberCount}** członkiem. Miłego pobytu!`
+    )
+    .setImage('attachment://welcome-banner.png')
+    .setFooter({
+        text: `Data utworzenia konta: ${formattedDate}`
+    });
 
         // =========================================================
         // WYSŁANIE
