@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { Client, GatewayIntentBits, Collection, REST, Routes, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Collection, REST, Routes, EmbedBuilder } = require('discord.js');
 const http = require('http');
 const { generateStaffEmbed } = require('./utils/sklad-administracji');
 
@@ -16,7 +16,8 @@ const client = new Client({
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.GuildMessages
-    ]
+    ],
+    partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
 client.commands = new Collection();
@@ -41,7 +42,6 @@ const CHANNEL_IDS = [
 
 const LOG_CHANNEL_ID = '1548682257320120380';
 
-// Funkcja pomocnicza do wysyłania logów
 async function sendLog(content) {
     try {
         const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
@@ -101,7 +101,6 @@ client.on('interactionCreate', async interaction => {
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
 
-    // Logowanie użycia komendy
     await sendLog(`⚙️ Użytkownik **${interaction.user.tag}** użył komendy \`/${interaction.commandName}\` na kanale <#${interaction.channelId}>.`);
 
     try {
@@ -136,8 +135,12 @@ async function getOrCreateUsersList(reaction) {
 
 client.on('messageReactionAdd', async (reaction, user) => {
     if (user.bot) return;
-    if (reaction.partial) await reaction.fetch();
-    if (reaction.message.partial) await reaction.message.fetch();
+    if (reaction.partial) {
+        try { await reaction.fetch(); } catch { return; }
+    }
+    if (reaction.message.partial) {
+        try { await reaction.message.fetch(); } catch { return; }
+    }
     if (reaction.emoji.id !== '1543969158646206475') return;
 
     const usersList = await getOrCreateUsersList(reaction);
@@ -150,8 +153,12 @@ client.on('messageReactionAdd', async (reaction, user) => {
 
 client.on('messageReactionRemove', async (reaction, user) => {
     if (user.bot) return;
-    if (reaction.partial) await reaction.fetch();
-    if (reaction.message.partial) await reaction.message.fetch();
+    if (reaction.partial) {
+        try { await reaction.fetch(); } catch { return; }
+    }
+    if (reaction.message.partial) {
+        try { await reaction.message.fetch(); } catch { return; }
+    }
     if (reaction.emoji.id !== '1543969158646206475') return;
 
     const usersList = await getOrCreateUsersList(reaction);
@@ -189,7 +196,6 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     await updateAdminMessage(newMember.guild);
 });
 
-// Nasłuchiwanie wyłączenia lub restartu procesów Node.js
 process.on('SIGINT', async () => {
     await sendLog('🔴 **Bot został wyłączony / zrestartowany!**');
     process.exit(0);
