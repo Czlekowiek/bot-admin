@@ -1,4 +1,5 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { drawCard } = require('discord-welcome-card');
 
 async function sendWelcomeMessage(member) {
     try {
@@ -14,8 +15,18 @@ async function sendWelcomeMessage(member) {
         const username = member.user.username;
         const serverName = member.guild.name;
 
-        // Używamy darmowego generatora banerów powitalnych
-        const bannerURL = `https://api.popcat.xyz/welcome?background=https://images.unsplash.com/photo-1518684079-3c830dcef090?q=80&w=1000&auto=format&fit=crop&avatar=${avatarURL}&text1=${encodeURIComponent(username)}&text2=${encodeURIComponent(serverName)}&text3=${encodeURIComponent(`Jesteś naszym ${memberCount} członkiem`)}`;
+        // Generowanie karty powitalnej w formie banera
+        const image = await drawCard({
+            theme: 'dark',
+            avatar: avatarURL,
+            name: username,
+            title: serverName,
+            subtitle: `Jesteś naszym ${memberCount} członkiem`,
+            background: 'https://images.unsplash.com/photo-1518684079-3c830dcef090?q=80&w=1000&auto=format&fit=crop',
+            rounded: true
+        });
+
+        const attachment = new AttachmentBuilder(image, { name: 'welcome-banner.png' });
 
         const embed = new EmbedBuilder()
             .setColor(16764416)
@@ -24,10 +35,10 @@ async function sendWelcomeMessage(member) {
                 `Cześć **${username}**! Witaj na **${serverName}**!\n` +
                 `Jesteś naszym **${memberCount}** członkiem. Miłego pobytu!`
             )
-            .setImage(bannerURL)
+            .setImage('attachment://welcome-banner.png')
             .setFooter({ text: `Data utworzenia konta: ${formattedDate}` });
 
-        await channel.send({ embeds: [embed] });
+        await channel.send({ embeds: [embed], files: [attachment] });
     } catch (error) {
         console.error('Błąd podczas wysyłania powitania:', error);
     }
