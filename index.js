@@ -20,11 +20,11 @@ const CHANNEL_IDS = [
     '1542122713676644352'
 ];
 
-// Lista ról: Technik pod Właścicielem, a Współwłaściciel pod Technikiem
+// Ostateczna kolejność: Właściciel -> Współwłaściciel -> Technik -> reszta
 const ROLES_TO_TRACK = [
     { id: '1542127037202825326', name: '<:owner_gradient:1548652163272675452> Właściciel' },
-    { id: '1543676695377215629', name: '<:admin_darkpurple:1548650402503852032> Technik' },
     { id: '1542127233093869701', name: '<:admin_yellow:1548649419434627246> Współwłaściciel' },
+    { id: '1543676695377215629', name: '<:admin_darkpurple:1548650402503852032> Technik' },
     { id: '1542128389274472458', name: '<:admin_red:1548649297724047450> Admin' },
     { id: '1542991925521420330', name: '<:admin_orange:1548649349834080327> Junior Admin' },
     { id: '1542127336193785886', name: '<:admin_blue:1548649538389024768> Developer' },
