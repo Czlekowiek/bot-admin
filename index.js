@@ -14,11 +14,11 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessageReactions
+        GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildMessages
     ]
 });
 
-// Kolekcja na komendy bota
 client.commands = new Collection();
 const commands = [];
 
@@ -56,8 +56,6 @@ async function updateAdminMessage(guild) {
                 await channel.send({ embeds: [newEmbed] });
             }
         }
-        
-        console.log('Zaktualizowano listę administracji na wszystkich kanałach!');
     } catch (error) {
         console.error('Błąd podczas aktualizacji wiadomości:', error);
     }
@@ -74,7 +72,6 @@ client.once('ready', async () => {
                 Routes.applicationGuildCommands(client.user.id, guild.id),
                 { body: commands },
             );
-            console.log('Zarejestrowano komendy Slash pomyślnie!');
         } catch (error) {
             console.error(error);
         }
@@ -83,7 +80,6 @@ client.once('ready', async () => {
     }
 });
 
-// Obsługa wykonywania komend przez użytkowników
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
@@ -94,37 +90,60 @@ client.on('interactionCreate', async interaction => {
         await command.execute(interaction);
     } catch (error) {
         console.error(error);
+        const replyOptions = { content: 'Wystąpił błąd podczas wykonywania tej komendy!', ephemeral: true };
         if (interaction.replied || interaction.deferred) {
-            await interaction.followUp({ content: 'Wystąpił błąd podczas wykonywania tej komendy!', ephemeral: true });
+            await interaction.followUp(replyOptions);
         } else {
-            await interaction.reply({ content: 'Wystąpił błąd podczas wykonywania tej komendy!', ephemeral: true });
+            await interaction.reply(replyOptions);
         }
     }
 });
 
-// System aktualizacji Top 3 aktywności po dodaniu reakcji
+const reactionHistory = new Map();
+
+async function getOrCreateUsersList(reaction) {
+    const msgId = reaction.message.id;
+    if (!reactionHistory.has(msgId)) {
+        const usersMap = await reaction.users.fetch({ limit: 100 });
+        const usersList = [];
+        for (const [userId, user] of usersMap) {
+            if (!user.bot) usersList.push(userId);
+        }
+        reactionHistory.set(msgId, usersList);
+    }
+    return reactionHistory.get(msgId);
+}
+
 client.on('messageReactionAdd', async (reaction, user) => {
     if (user.bot) return;
     if (reaction.partial) await reaction.fetch();
     if (reaction.message.partial) await reaction.message.fetch();
-
     if (reaction.emoji.id !== '1543969158646206475') return;
 
-    await updateActivityBoard(reaction.message);
+    const usersList = await getOrCreateUsersList(reaction);
+    if (!usersList.includes(user.id)) {
+        usersList.push(user.id);
+    }
+
+    await updateActivityBoard(reaction.message, usersList);
 });
 
-// System aktualizacji Top 3 aktywności po usunięciu reakcji
 client.on('messageReactionRemove', async (reaction, user) => {
     if (user.bot) return;
     if (reaction.partial) await reaction.fetch();
     if (reaction.message.partial) await reaction.message.fetch();
-
     if (reaction.emoji.id !== '1543969158646206475') return;
 
-    await updateActivityBoard(reaction.message);
+    const usersList = await getOrCreateUsersList(reaction);
+    const index = usersList.indexOf(user.id);
+    if (index > -1) {
+        usersList.splice(index, 1);
+    }
+
+    await updateActivityBoard(reaction.message, usersList);
 });
 
-async function updateActivityBoard(message) {
+async function updateActivityBoard(message, usersList) {
     if (!message.embeds.length) return;
     const embed = message.embeds[0];
     const description = embed.description;
@@ -132,23 +151,9 @@ async function updateActivityBoard(message) {
     const opisMatch = description.split(/Opis: /);
     const activityDescription = opisMatch[1] ? opisMatch[1] : null;
 
-    const reaction = message.reactions.cache.get('1543969158646206475');
-    if (!reaction) return;
-
-    // Pobieramy użytkowników z API
-    const users = await reaction.users.fetch({ limit: 100 });
-    
-    const humanUsers = [];
-    for (const [userId, user] of users) {
-        if (!user.bot) {
-            humanUsers.push(user);
-        }
-    }
-
-    // Pierwsza osoba która kliknęła jest na indeksie 0
-    const top1 = humanUsers[0] ? `<@${humanUsers[0].id}>` : 'Brak';
-    const top2 = humanUsers[1] ? `<@${humanUsers[1].id}>` : 'Brak';
-    const top3 = humanUsers[2] ? `<@${humanUsers[2].id}>` : 'Brak';
+    const top1 = usersList[0] ? `<@${usersList[0]}>` : 'Brak';
+    const top2 = usersList[1] ? `<@${usersList[1]}>` : 'Brak';
+    const top3 = usersList[2] ? `<@${usersList[2]}>` : 'Brak';
 
     let newDescription = `# <a:checkmark:1543969158646206475> Aktywność check\n## <a:top1:1548673656761352304> 1. ${top1}\n## <a:top2:1548673747983011891> 2. ${top2}\n## <a:top3:1548673801104138322> 3. ${top3}\n\n## <a:dot:1543969325155745812> Zareaguj emotką "<a:checkmark:1543969158646206475>" poniżej aby zaznaczyć aktywność.`;
 
