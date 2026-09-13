@@ -21,7 +21,6 @@ const ROLES_TO_TRACK = [
     { id: '1548633496220864624', name: 'Właściciel' },
     { id: '1548633906969051156', name: 'Technik' },
     { id: '1548633531482247188', name: 'Admin' },
-    { id: '1548633569814122617', name: 'Rola 4' } // Jeśli potrzebujesz też czwartej roli
 ];
 
 let targetMessage = null;
