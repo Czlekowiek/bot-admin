@@ -23,18 +23,6 @@ const client = new Client({
 client.commands = new Collection();
 const commands = [];
 
-const commandsPath = path.join(__dirname, 'commands');
-const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-
-for (const file of commandFiles) {
-    const filePath = path.join(commandsPath, file);
-    const command = require(filePath);
-    if ('data' in command && 'execute' in command) {
-        client.commands.set(command.data.name, command);
-        commands.push(command.data.toJSON());
-    }
-}
-
 const CHANNEL_IDS = [
     '1548638166389366834',
     '1542122713676644352'
@@ -52,6 +40,44 @@ async function sendLog(content) {
         console.error('Błąd podczas wysyłania logu:', error);
     }
 }
+
+// System sprawdzania zmodyfikowanych komend
+const versionsFilePath = path.join(__dirname, 'command-versions.json');
+let savedVersions = {};
+if (fs.existsSync(versionsFilePath)) {
+    try {
+        savedVersions = JSON.parse(fs.readFileSync(versionsFilePath, 'utf8'));
+    } catch (e) {
+        savedVersions = {};
+    }
+}
+
+const commandsPath = path.join(__dirname, 'commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+const currentVersions = {};
+const modifiedCommands = [];
+
+for (const file of commandFiles) {
+    const filePath = path.join(commandsPath, file);
+    const fileContent = fs.readFileSync(filePath, 'utf8');
+    
+    // Proste hashowanie kodu pliku (liczba znaków + długość) lub mtime
+    const stats = fs.statSync(filePath);
+    currentVersions[file] = stats.mtimeMs;
+
+    if (savedVersions[file] !== stats.mtimeMs) {
+        modifiedCommands.push(file.replace('.js', ''));
+    }
+
+    const command = require(filePath);
+    if ('data' in command && 'execute' in command) {
+        client.commands.set(command.data.name, command);
+        commands.push(command.data.toJSON());
+    }
+}
+
+// Zapisz nowe wersje
+fs.writeFileSync(versionsFilePath, JSON.stringify(currentVersions, null, 2));
 
 async function updateAdminMessage(guild) {
     try {
@@ -77,7 +103,15 @@ async function updateAdminMessage(guild) {
 
 client.once('ready', async () => {
     console.log(`Zalogowano jako ${client.user.tag}!`);
-    await sendLog(`🟢 **Bot został uruchomiony!** Zalogowano jako \`${client.user.tag}\`.`);
+    
+    setTimeout(async () => {
+        await sendLog(`Bot został uruchomiony. Zalogowano jako \`${client.user.tag}\`.`);
+        
+        if (modifiedCommands.length > 0) {
+            const list = modifiedCommands.map(c => `\`/${c}\``).join(', ');
+            await sendLog(`Wykryto zmianę kodu w komendach: ${list}`);
+        }
+    }, 1000);
 
     const guild = client.guilds.cache.first();
     if (guild) {
@@ -89,6 +123,7 @@ client.once('ready', async () => {
             );
         } catch (error) {
             console.error(error);
+            await sendLog(`❌ **Błąd podczas rejestrowania komend:** \`${error.message}\``);
         }
 
         await updateAdminMessage(guild);
@@ -101,13 +136,13 @@ client.on('interactionCreate', async interaction => {
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
 
-    await sendLog(`⚙️ Użytkownik **${interaction.user.tag}** użył komendy \`/${interaction.commandName}\` na kanale <#${interaction.channelId}>.`);
+    await sendLog(`Użytkownik ${interaction.user.tag} użył komendy \`/${interaction.commandName}\` na kanale <#${interaction.channelId}>.`);
 
     try {
         await command.execute(interaction);
     } catch (error) {
         console.error(error);
-        await sendLog(`❌ Błąd podczas wykonywania komendy \`/${interaction.commandName}\` przez **${interaction.user.tag}**: \`${error.message}\``);
+        await sendLog(`❌ **Błąd podczas wykonywania komendy** \`/${interaction.commandName}\` przez ${interaction.user.tag}: \`${error.message}\``);
         
         const replyOptions = { content: 'Wystąpił błąd podczas wykonywania tej komendy!', ephemeral: true };
         if (interaction.replied || interaction.deferred) {
@@ -182,7 +217,7 @@ async function updateActivityBoard(message, usersList) {
     const top2 = usersList[1] ? `<@${usersList[1]}>` : 'Brak';
     const top3 = usersList[2] ? `<@${usersList[2]}>` : 'Brak';
 
-    let newDescription = `# <a:checkmark:1543969158646206475> Aktywność check\n## <a:top1:1548673656761352304> 1. ${top1}\n## <a:top2:1548673747983011891> 2. ${top2}\n## <a:top3:1548673801104138322> 3. ${top3}\n\n## <a:dot:1543969325155745812> Zareaguj emotką "<a:checkmark:1543969158646206475>" poniżej aby zaznaczyć aktywność.`;
+    let newDescription = `# Aktywność check\n## 1. ${top1}\n## 2. ${top2}\n## 3. ${top3}\n\n## Zareaguj emotką poniżej aby zaznaczyć aktywność.`;
 
     if (activityDescription) {
         newDescription += `\n\n### Opis: ${activityDescription}`;
@@ -197,12 +232,12 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 });
 
 process.on('SIGINT', async () => {
-    await sendLog('🔴 **Bot został wyłączony / zrestartowany!**');
+    await sendLog('Bot został wyłączony / zrestartowany.');
     process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-    await sendLog('🔴 **Bot został wyłączony / zrestartowany!**');
+    await sendLog('Bot został wyłączony / zrestartowany.');
     process.exit(0);
 });
 
