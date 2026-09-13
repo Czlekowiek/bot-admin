@@ -3,6 +3,7 @@ const path = require('path');
 const { Client, GatewayIntentBits, Partials, Collection, REST, Routes, EmbedBuilder } = require('discord.js');
 const http = require('http');
 const { generateStaffEmbed } = require('./utils/sklad-administracji');
+const { sendWelcomeMessage } = require('./utils/welcome'); // Import funkcji powitań
 
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -123,6 +124,11 @@ client.once('ready', async () => {
 
         await updateAdminMessage(guild);
     }
+});
+
+// Obsługa powitania przez moduł z utils
+client.on('guildMemberAdd', async member => {
+    await sendWelcomeMessage(member);
 });
 
 client.on('interactionCreate', async interaction => {
