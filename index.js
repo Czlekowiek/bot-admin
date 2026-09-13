@@ -14,7 +14,7 @@ const http = require('http');
 
 const { generateStaffEmbed } = require('./utils/sklad-administracji');
 const { sendWelcomeMessage } = require('./utils/welcome');
-const { sendByeMessage } = require('./utils/bye');
+const { sendLeaveMessage } = require('./utils/bye');
 
 // =========================================================
 // HTTP SERVER - RENDER
