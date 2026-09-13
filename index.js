@@ -67,7 +67,6 @@ async function generateEmbed(guild) {
 
     const embed = new EmbedBuilder()
         .setDescription(descriptionText.trim())
-        .setImage('https://cdn.discordapp.com/attachments/1545884336782446612/1548667700161544252/Zaokraglone_logo.png')
         .setColor(16764416)
         .setFooter({
             text: `Stworzone przez @czlekowiek • Ostatnia aktualizacja: ${formattedTime}`,
