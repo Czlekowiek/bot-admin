@@ -16,11 +16,12 @@ const client = new Client({
 
 const CHANNEL_ID = '1548638166389366834';
 
-// Twoje role dopasowane do struktury
+// Role, które bot ma sprawdzać (ID roli oraz jej nazwa wyświetlana w embedzie)
 const ROLES_TO_TRACK = [
     { id: '1548633496220864624', name: 'Właściciel' },
     { id: '1548633906969051156', name: 'Technik' },
     { id: '1548633531482247188', name: 'Admin' },
+    { id: '1548633569814122617', name: 'Rola 4' } // Jeśli masz czwartą rolę, dopisz jej ID
 ];
 
 let targetMessage = null;
@@ -33,6 +34,7 @@ async function generateEmbed(guild) {
         
         let membersList = '<:arrow:1543977081233342494> Brak osób';
         if (role && role.members.size > 0) {
+            // Pobiera użytkowników z danej roli i robi z nich wzmianki rozdzielone nową linią
             membersList = role.members.map(member => `<:arrow:1543977081233342494> <@${member.id}>`).join('\n');
         }
 
@@ -41,7 +43,7 @@ async function generateEmbed(guild) {
 
     const embed = new EmbedBuilder()
         .setDescription(descriptionText.trim())
-        .setColor(16764416) // Żółtawy/bursztynowy kolor z Twojego wzoru
+        .setColor(16764416)
         .setFooter({
             text: 'Stworzone przez @czlekowiek',
             icon_url: 'https://cdn.discordapp.com/attachments/1548638166389366834/1548644226399600680/czlekowiek-avatar-1024.png'
@@ -56,7 +58,7 @@ async function updateAdminMessage(guild) {
         if (!channel) return console.log('Nie znaleziono kanału!');
 
         const newEmbed = await generateEmbed(guild);
-        const contentText = '<:staff:1548644739237027902> Skład Administracji';
+        const contentText = '# <:staff:1548644739237027902> Skład Administracji';
 
         if (!targetMessage) {
             const messages = await channel.messages.fetch({ limit: 10 });
