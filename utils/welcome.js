@@ -51,12 +51,12 @@ async function sendWelcomeMessage(member) {
         ctx.drawImage(avatar, centerX - avatarRadius, centerY - avatarRadius, avatarRadius * 2, avatarRadius * 2);
         ctx.restore();
 
-        // 6. Rysowanie nazwy użytkownika (Wymuszenie czystego, grubego sans-serif, kolor biały, wyśrodkowanie)
+        // 6. Rysowanie nazwy użytkownika (używamy DejaVu Sans, która zadziała po dodaniu Aptfile)
         ctx.save();
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 52px sans-serif'; // Bezpośrednie użycie sans-serif zapobiega błędom braku czcionki w chmurze
+        ctx.font = 'bold 46px "DejaVu Sans", sans-serif';
         ctx.fillText(username, 606, 355);
         ctx.restore();
 
