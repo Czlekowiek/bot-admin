@@ -10,7 +10,7 @@ async function sendWelcomeMessage(member) {
             .catch(() => null);
 
         if (!channel) {
-            console.error('Nie znaleziono kanału powitalnego.');
+            console.error('❌ Nie znaleziono kanału powitalnego.');
             return;
         }
 
@@ -35,7 +35,6 @@ async function sendWelcomeMessage(member) {
         const canvas = Canvas.createCanvas(WIDTH, HEIGHT);
         const ctx = canvas.getContext('2d');
 
-        // Zawsze normalne nakładanie elementów
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1;
 
@@ -45,10 +44,13 @@ async function sendWelcomeMessage(member) {
 
         const background = await Canvas
             .loadImage('https://iili.io/nqND2ls.png')
-            .catch(() => null);
+            .catch((error) => {
+                console.error('❌ Błąd pobierania tła:', error);
+                return null;
+            });
 
         if (!background) {
-            console.error('Nie udało się pobrać tła.');
+            console.error('❌ Nie udało się pobrać tła.');
             return;
         }
 
@@ -68,11 +70,10 @@ async function sendWelcomeMessage(member) {
         const centerY = 153;
         const avatarRadius = 104;
 
-        // Obramowanie avatara
+        // Czarne półprzezroczyste tło pod obwódką
         ctx.save();
 
         ctx.beginPath();
-
         ctx.arc(
             centerX,
             centerY,
@@ -85,12 +86,15 @@ async function sendWelcomeMessage(member) {
         ctx.fill();
 
         ctx.lineWidth = 3;
-        ctx.strokeStyle = '#ffffff';
+        ctx.strokeStyle = '#FFFFFF';
         ctx.stroke();
 
         ctx.restore();
 
-        // Avatar użytkownika
+        // =========================================================
+        // AVATAR UŻYTKOWNIKA
+        // =========================================================
+
         const avatarURL = member.user.displayAvatarURL({
             extension: 'png',
             size: 512
@@ -98,7 +102,10 @@ async function sendWelcomeMessage(member) {
 
         const avatar = await Canvas
             .loadImage(avatarURL)
-            .catch(() => null);
+            .catch((error) => {
+                console.error('❌ Błąd pobierania avatara:', error);
+                return null;
+            });
 
         if (avatar) {
             ctx.save();
@@ -125,71 +132,105 @@ async function sendWelcomeMessage(member) {
             );
 
             ctx.restore();
+        } else {
+            console.warn('⚠️ Nie udało się pobrać avatara.');
         }
 
         // =========================================================
-        // NAZWA UŻYTKOWNIKA
+        // TEKST - SVG
+        // =========================================================
+        //
+        // NIE korzystamy tutaj z ctx.measureText().
+        //
+        // Dzięki SVG kolor i rozmiar tekstu są niezależne
+        // od problematycznego renderowania tekstu przez canvas.
+        // =========================================================
+
+        const TEXT_Y = 360;
+        const FONT_SIZE = 100;
+
+        /*
+         * Escape znaków specjalnych dla SVG.
+         * Dzięki temu nick zawierający &, <, > itd. nie zepsuje SVG.
+         */
+        const escapeXml = (text) => {
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;');
+        };
+
+        const safeUsername = escapeXml(username);
+
+        /*
+         * SVG ma dokładnie taki sam rozmiar jak canvas.
+         *
+         * x="600" + text-anchor="middle"
+         * = tekst idealnie na środku.
+         *
+         * fill="#FFFFFF"
+         * = biały.
+         *
+         * font-weight="900"
+         * = bardzo gruby.
+         */
+        const textSvg = `
+<svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="${WIDTH}"
+    height="${HEIGHT}"
+    viewBox="0 0 ${WIDTH} ${HEIGHT}"
+>
+    <text
+        x="600"
+        y="${TEXT_Y}"
+        text-anchor="middle"
+        dominant-baseline="middle"
+        fill="#FFFFFF"
+        fill-opacity="1"
+        stroke="none"
+        font-family="DejaVu Sans, Arial, sans-serif"
+        font-size="${FONT_SIZE}px"
+        font-weight="900"
+    >${safeUsername}</text>
+</svg>
+`;
+
+        // =========================================================
+        // ŁADOWANIE SVG
+        // =========================================================
+
+        const textImage = await Canvas
+            .loadImage(
+                Buffer.from(textSvg, 'utf8')
+            )
+            .catch((error) => {
+                console.error('❌ Błąd renderowania SVG:', error);
+                return null;
+            });
+
+        if (!textImage) {
+            console.error('❌ Nie udało się utworzyć tekstu SVG.');
+            return;
+        }
+
+        // =========================================================
+        // WKLEJENIE TEKSTU
         // =========================================================
 
         ctx.save();
 
-        // Absolutny reset transformacji
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-        // Normalne rysowanie
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1;
 
-        // Wyśrodkowanie tekstu
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        // =========================================================
-        // CZCIONKA
-        // =========================================================
-
-        let fontSize = 100;
-
-        const maxTextWidth = 850;
-
-        ctx.font = `bold ${fontSize}px "DejaVu Sans"`;
-
-        // Dopasowanie bardzo długich nicków
-        while (
-            ctx.measureText(username).width > maxTextWidth &&
-            fontSize > 45
-        ) {
-            fontSize -= 2;
-            ctx.font = `bold ${fontSize}px "DejaVu Sans"`;
-        }
-
-        // =========================================================
-        // KOLOR
-        // =========================================================
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 1)';
-
-        // Brak obrysu
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0)';
-        ctx.lineWidth = 0;
-
-        // =========================================================
-        // POZYCJA
-        // =========================================================
-
-        const textX = WIDTH / 2;
-
-        // Celowo wyżej niż poprzednie 375
-        const textY = 360;
-
-        // =========================================================
-        // TEKST
-        // =========================================================
-
-        ctx.fillText(
-            username,
-            textX,
-            textY
+        ctx.drawImage(
+            textImage,
+            0,
+            0,
+            WIDTH,
+            HEIGHT
         );
 
         ctx.restore();
@@ -201,23 +242,24 @@ async function sendWelcomeMessage(member) {
         console.log('======================================');
         console.log('🖼️ WELCOME BANNER');
         console.log('👤 Username:', username);
-        console.log('🔠 Font:', `bold ${fontSize}px "DejaVu Sans"`);
-        console.log(
-            '📏 Text width:',
-            ctx.measureText(username).width
-        );
-        console.log('📍 X:', textX);
-        console.log('📍 Y:', textY);
+        console.log('🔠 Font: SVG DejaVu Sans');
+        console.log('🔠 Font size:', FONT_SIZE);
+        console.log('📍 X:', 600);
+        console.log('📍 Y:', TEXT_Y);
         console.log('🎨 Kolor: #FFFFFF');
-        console.log('🔄 Transform: 1, 0, 0, 1, 0, 0');
+        console.log('💪 Font weight: 900');
+        console.log('🖼️ Tło: OK');
+        console.log('👤 Avatar:', avatar ? 'OK' : 'BRAK');
         console.log('======================================');
 
         // =========================================================
-        // ZAŁĄCZNIK
+        // PNG
         // =========================================================
 
+        const imageBuffer = canvas.toBuffer('image/png');
+
         const attachment = new AttachmentBuilder(
-            canvas.toBuffer('image/png'),
+            imageBuffer,
             {
                 name: 'welcome-banner.png'
             }
