@@ -3,10 +3,6 @@ const Canvas = require('canvas');
 
 async function sendWelcomeMessage(member) {
     try {
-        // ==========================================
-        // USTAWIENIA
-        // ==========================================
-
         const WELCOME_CHANNEL_ID = '1542121319263641682';
 
         // ==========================================
@@ -23,12 +19,12 @@ async function sendWelcomeMessage(member) {
         }
 
         // ==========================================
-        // INFORMACJE O UŻYTKOWNIKU
+        // INFORMACJE
         // ==========================================
 
-        const memberCount = member.guild.memberCount;
         const username = member.user.username;
         const serverName = member.guild.name;
+        const memberCount = member.guild.memberCount;
 
         const createdAt = member.user.createdAt;
 
@@ -43,7 +39,7 @@ async function sendWelcomeMessage(member) {
         });
 
         // ==========================================
-        // TWORZENIE CANVAS
+        // CANVAS
         // ==========================================
 
         const canvas = Canvas.createCanvas(1200, 633);
@@ -56,44 +52,39 @@ async function sendWelcomeMessage(member) {
         const background = await Canvas
             .loadImage('https://iili.io/nqND2ls.png')
             .catch((error) => {
-                console.error('❌ Nie udało się pobrać tła:', error);
+                console.error('❌ Błąd pobierania tła:', error);
                 return null;
             });
 
-        if (!background) {
-            return;
-        }
+        if (!background) return;
 
         ctx.drawImage(
             background,
             0,
             0,
-            1200,
-            633
+            canvas.width,
+            canvas.height
         );
 
         // ==========================================
         // AVATAR
         // ==========================================
 
-        const avatarCenterX = 600;
-        const avatarCenterY = 153;
+        const avatarX = 600;
+        const avatarY = 153;
         const avatarRadius = 104;
 
-        // Obramowanie avatara
+        // Obramowanie
         ctx.save();
 
         ctx.beginPath();
-
         ctx.arc(
-            avatarCenterX,
-            avatarCenterY,
+            avatarX,
+            avatarY,
             avatarRadius + 6,
             0,
             Math.PI * 2
         );
-
-        ctx.closePath();
 
         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
         ctx.fill();
@@ -104,36 +95,32 @@ async function sendWelcomeMessage(member) {
 
         ctx.restore();
 
-        // Pobieranie avatara
+        // Avatar
         const avatar = await Canvas
             .loadImage(avatarURL)
             .catch((error) => {
-                console.error('❌ Nie udało się pobrać avatara:', error);
+                console.error('❌ Błąd pobierania avatara:', error);
                 return null;
             });
 
-        // Rysowanie avatara
         if (avatar) {
             ctx.save();
 
             ctx.beginPath();
-
             ctx.arc(
-                avatarCenterX,
-                avatarCenterY,
+                avatarX,
+                avatarY,
                 avatarRadius,
                 0,
                 Math.PI * 2
             );
 
-            ctx.closePath();
-
             ctx.clip();
 
             ctx.drawImage(
                 avatar,
-                avatarCenterX - avatarRadius,
-                avatarCenterY - avatarRadius,
+                avatarX - avatarRadius,
+                avatarY - avatarRadius,
                 avatarRadius * 2,
                 avatarRadius * 2
             );
@@ -147,28 +134,32 @@ async function sendWelcomeMessage(member) {
 
         ctx.save();
 
-        // Początkowy rozmiar tekstu
-        let fontSize = 46;
+        /*
+         * NIE używamy:
+         * ctx.textAlign = 'center'
+         *
+         * Środek obliczamy ręcznie.
+         */
+
+        // Duży rozmiar początkowy
+        let fontSize = 80;
 
         // Maksymalna szerokość nicku
-        const maxTextWidth = 700;
+        const maxWidth = 850;
 
-        // Używamy zwykłego Arial.
-        // Nie potrzebujemy żadnych dodatkowych fontów.
-        ctx.font = `bold ${fontSize}px Arial`;
+        // DejaVu Sans jest bezpieczniejszy na Linux/Render
+        ctx.font = `bold ${fontSize}px "DejaVu Sans"`;
 
-        // Sprawdzamy szerokość tekstu
         let textWidth = ctx.measureText(username).width;
 
-        // Jeżeli nick jest za długi,
-        // zmniejszamy czcionkę
+        // Zmniejszamy tylko jeśli nick jest naprawdę długi
         while (
-            textWidth > maxTextWidth &&
-            fontSize > 18
+            textWidth > maxWidth &&
+            fontSize > 30
         ) {
             fontSize -= 2;
 
-            ctx.font = `bold ${fontSize}px Arial`;
+            ctx.font = `bold ${fontSize}px "DejaVu Sans"`;
 
             textWidth = ctx.measureText(username).width;
         }
@@ -177,42 +168,32 @@ async function sendWelcomeMessage(member) {
         // RĘCZNE CENTROWANIE
         // ==========================================
 
-        // Środek banera to dokładnie X = 600
         const centerX = 600;
 
-        // Pozycja Y tekstu
-        const textY = 355;
-
-        // Obliczamy początek tekstu.
-        //
-        // Przykład:
-        // tekst ma 400px szerokości
-        //
-        // 600 - 200 = 400
-        //
-        // tekst zacznie się na X=400
-        // i skończy na X=800
-        //
-        // dzięki temu środek będzie dokładnie na X=600.
         const textX = centerX - (textWidth / 2);
 
+        // Pozycja pionowa
+        const textY = 355;
+
         // ==========================================
-        // KOLOR TEKSTU
+        // KOLOR
         // ==========================================
 
-        ctx.fillStyle = '#FFFFFF';
+        // Bardzo ważne:
+        // ustawiamy kolor BEZPOŚREDNIO przed fillText
+        ctx.fillStyle = 'rgb(255, 255, 255)';
 
         // ==========================================
         // CIEŃ
         // ==========================================
 
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
-        ctx.shadowBlur = 6;
-        ctx.shadowOffsetX = 2;
-        ctx.shadowOffsetY = 2;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetX = 3;
+        ctx.shadowOffsetY = 3;
 
         // ==========================================
-        // RYSOWANIE TEKSTU
+        // TEKST
         // ==========================================
 
         ctx.fillText(
@@ -224,21 +205,21 @@ async function sendWelcomeMessage(member) {
         ctx.restore();
 
         // ==========================================
-        // LOGI
+        // DEBUG
         // ==========================================
 
-        console.log('================================');
+        console.log('======================================');
         console.log('🖼️ WELCOME BANNER');
         console.log('👤 Username:', username);
-        console.log('🔤 Font:', `bold ${fontSize}px Arial`);
+        console.log('🔤 Font:', `bold ${fontSize}px "DejaVu Sans"`);
         console.log('📏 Text width:', textWidth);
         console.log('📍 Text X:', textX);
         console.log('📍 Text Y:', textY);
-        console.log('🎯 Canvas center:', centerX);
-        console.log('================================');
+        console.log('🎨 Text color: WHITE');
+        console.log('======================================');
 
         // ==========================================
-        // GENEROWANIE OBRAZU
+        // PNG
         // ==========================================
 
         const attachment = new AttachmentBuilder(
@@ -273,13 +254,11 @@ async function sendWelcomeMessage(member) {
             files: [attachment]
         });
 
-        console.log(
-            `✅ Wysłano wiadomość powitalną dla ${username}.`
-        );
+        console.log(`✅ Powitanie wysłane dla ${username}`);
 
     } catch (error) {
         console.error(
-            '❌ Błąd podczas generowania i wysyłania powitania:',
+            '❌ Błąd podczas generowania powitania:',
             error
         );
     }
