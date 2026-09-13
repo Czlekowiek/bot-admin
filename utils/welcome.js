@@ -117,19 +117,16 @@ async function sendWelcomeMessage(member) {
 
         /*
          * Normalny rozmiar tekstu.
-         * Dla zwykłych nicków pozostaje dokładnie 85 px.
          */
         const NORMAL_FONT_SIZE = 85;
 
         /*
          * Maksymalna szerokość nicku.
-         * Długi nick zostanie automatycznie zmniejszony,
-         * żeby nie wychodził poza wyznaczone pole.
          */
         const MAX_TEXT_WIDTH = 850;
 
         /*
-         * Minimalny rozmiar dla ekstremalnie długich nazw.
+         * Minimalny rozmiar dla bardzo długich nazw.
          */
         const MIN_FONT_SIZE = 40;
 
@@ -142,12 +139,6 @@ async function sendWelcomeMessage(member) {
         // AUTOMATYCZNE ZMNIEJSZANIE CZCIONKI
         // =========================================================
 
-        /*
-         * Szacowanie szerokości tekstu przy 85 px.
-         *
-         * Dla normalnych nazw wynik pozostaje 85 px.
-         * Gdy nick jest za długi, czcionka zostaje zmniejszona.
-         */
         const estimatedWidthAt85 = username.length * 48;
 
         let FONT_SIZE = NORMAL_FONT_SIZE;
@@ -168,25 +159,24 @@ async function sendWelcomeMessage(member) {
         // AUTOMATYCZNE PRZESUNIĘCIE DŁUGIEGO TEKSTU W GÓRĘ
         // =========================================================
 
-        /*
-         * Normalny nick:
-         * FONT_SIZE = 85
-         * TEXT_Y = 375
-         *
-         * Im bardziej zmniejsza się czcionka,
-         * tym delikatnie przesuwamy tekst wyżej.
-         *
-         * Maksymalne przesunięcie = 12 px.
-         */
         const sizeDifference =
             NORMAL_FONT_SIZE - FONT_SIZE;
 
+        /*
+         * Każdy tekst jest dodatkowo 2 px wyżej.
+         *
+         * Normalny nick:
+         * 375 - 2 = 373
+         *
+         * Pomniejszony nick:
+         * jego automatyczna pozycja - dodatkowe 2 px
+         */
         const TEXT_Y =
             NORMAL_TEXT_Y -
             Math.min(
                 12,
                 sizeDifference * 0.25
-            );
+            ) - 2;
 
         // =========================================================
         // ESCAPE DLA SVG
