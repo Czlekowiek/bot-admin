@@ -147,7 +147,7 @@ async function sendWelcomeMessage(member) {
         // =========================================================
 
         const TEXT_Y = 380;
-        const FONT_SIZE = 95;
+        const FONT_SIZE = 85;
 
         /*
          * Escape znaków specjalnych dla SVG.
