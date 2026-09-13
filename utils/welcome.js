@@ -70,10 +70,6 @@ async function sendWelcomeMessage(member) {
         const centerY = 153;
         const avatarRadius = 104;
 
-        // =========================================================
-        // AVATAR UŻYTKOWNIKA
-        // =========================================================
-
         const avatarURL = member.user.displayAvatarURL({
             extension: 'png',
             size: 512
@@ -118,46 +114,84 @@ async function sendWelcomeMessage(member) {
         // =========================================================
         // TEKST - SVG
         // =========================================================
-        //
-        // NIE korzystamy tutaj z ctx.measureText().
-        //
-        // Dzięki SVG kolor i rozmiar tekstu są niezależne
-        // od problematycznego renderowania tekstu przez canvas.
-        // =========================================================
-
-const TEXT_Y = 375;
-
-// Normalny rozmiar tekstu
-const NORMAL_FONT_SIZE = 85;
-
-// Maksymalna szerokość nicku na banerze
-const MAX_TEXT_WIDTH = 850;
-
-// Minimalny rozmiar dla bardzo długich nicków
-const MIN_FONT_SIZE = 40;
-
-// Szacowanie szerokości tekstu.
-// DejaVu Sans przy font-weight 900 jest mniej więcej
-// proporcjonalny do rozmiaru czcionki.
-const estimatedWidthAt85 = username.length * 48;
-
-let FONT_SIZE = NORMAL_FONT_SIZE;
-
-if (estimatedWidthAt85 > MAX_TEXT_WIDTH) {
-    FONT_SIZE = Math.floor(
-        NORMAL_FONT_SIZE * MAX_TEXT_WIDTH / estimatedWidthAt85
-    );
-
-    if (FONT_SIZE < MIN_FONT_SIZE) {
-        FONT_SIZE = MIN_FONT_SIZE;
-    }
-}
-
 
         /*
-         * Escape znaków specjalnych dla SVG.
-         * Dzięki temu nick zawierający &, <, > itd. nie zepsuje SVG.
+         * Normalny rozmiar tekstu.
+         * Dla zwykłych nicków pozostaje dokładnie 85 px.
          */
+        const NORMAL_FONT_SIZE = 85;
+
+        /*
+         * Maksymalna szerokość nicku.
+         * Długi nick zostanie automatycznie zmniejszony,
+         * żeby nie wychodził poza wyznaczone pole.
+         */
+        const MAX_TEXT_WIDTH = 850;
+
+        /*
+         * Minimalny rozmiar dla ekstremalnie długich nazw.
+         */
+        const MIN_FONT_SIZE = 40;
+
+        /*
+         * Normalna pozycja tekstu.
+         */
+        const NORMAL_TEXT_Y = 375;
+
+        // =========================================================
+        // AUTOMATYCZNE ZMNIEJSZANIE CZCIONKI
+        // =========================================================
+
+        /*
+         * Szacowanie szerokości tekstu przy 85 px.
+         *
+         * Dla normalnych nazw wynik pozostaje 85 px.
+         * Gdy nick jest za długi, czcionka zostaje zmniejszona.
+         */
+        const estimatedWidthAt85 = username.length * 48;
+
+        let FONT_SIZE = NORMAL_FONT_SIZE;
+
+        if (estimatedWidthAt85 > MAX_TEXT_WIDTH) {
+            FONT_SIZE = Math.floor(
+                NORMAL_FONT_SIZE *
+                MAX_TEXT_WIDTH /
+                estimatedWidthAt85
+            );
+
+            if (FONT_SIZE < MIN_FONT_SIZE) {
+                FONT_SIZE = MIN_FONT_SIZE;
+            }
+        }
+
+        // =========================================================
+        // AUTOMATYCZNE PRZESUNIĘCIE DŁUGIEGO TEKSTU W GÓRĘ
+        // =========================================================
+
+        /*
+         * Normalny nick:
+         * FONT_SIZE = 85
+         * TEXT_Y = 375
+         *
+         * Im bardziej zmniejsza się czcionka,
+         * tym delikatnie przesuwamy tekst wyżej.
+         *
+         * Maksymalne przesunięcie = 12 px.
+         */
+        const sizeDifference =
+            NORMAL_FONT_SIZE - FONT_SIZE;
+
+        const TEXT_Y =
+            NORMAL_TEXT_Y -
+            Math.min(
+                12,
+                sizeDifference * 0.25
+            );
+
+        // =========================================================
+        // ESCAPE DLA SVG
+        // =========================================================
+
         const escapeXml = (text) => {
             return String(text)
                 .replace(/&/g, '&amp;')
@@ -169,18 +203,10 @@ if (estimatedWidthAt85 > MAX_TEXT_WIDTH) {
 
         const safeUsername = escapeXml(username);
 
-        /*
-         * SVG ma dokładnie taki sam rozmiar jak canvas.
-         *
-         * x="600" + text-anchor="middle"
-         * = tekst idealnie na środku.
-         *
-         * fill="#FFFFFF"
-         * = biały.
-         *
-         * font-weight="900"
-         * = bardzo gruby.
-         */
+        // =========================================================
+        // SVG TEKSTU
+        // =========================================================
+
         const textSvg = `
 <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -212,12 +238,17 @@ if (estimatedWidthAt85 > MAX_TEXT_WIDTH) {
                 Buffer.from(textSvg, 'utf8')
             )
             .catch((error) => {
-                console.error('❌ Błąd renderowania SVG:', error);
+                console.error(
+                    '❌ Błąd renderowania SVG:',
+                    error
+                );
                 return null;
             });
 
         if (!textImage) {
-            console.error('❌ Nie udało się utworzyć tekstu SVG.');
+            console.error(
+                '❌ Nie udało się utworzyć tekstu SVG.'
+            );
             return;
         }
 
@@ -249,11 +280,12 @@ if (estimatedWidthAt85 > MAX_TEXT_WIDTH) {
         console.log('👤 Username:', username);
         console.log('🔠 Font: SVG DejaVu Sans');
         console.log('🔠 Font size:', FONT_SIZE);
+        console.log('📏 Max text width:', MAX_TEXT_WIDTH);
         console.log('📍 X:', 600);
         console.log('📍 Y:', TEXT_Y);
         console.log('🎨 Kolor: #FFFFFF');
         console.log('💪 Font weight: 900');
-        console.log('🖼️ Tło: OK');
+        console.log('🖼️ Tło:', background ? 'OK' : 'BRAK');
         console.log('👤 Avatar:', avatar ? 'OK' : 'BRAK');
         console.log('======================================');
 
