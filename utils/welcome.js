@@ -52,11 +52,13 @@ async function sendWelcomeMessage(member) {
         const background = await Canvas
             .loadImage('https://iili.io/nqND2ls.png')
             .catch((error) => {
-                console.error('❌ Błąd pobierania tła:', error);
+                console.error('❌ Nie udało się pobrać tła:', error);
                 return null;
             });
 
-        if (!background) return;
+        if (!background) {
+            return;
+        }
 
         ctx.drawImage(
             background,
@@ -74,10 +76,10 @@ async function sendWelcomeMessage(member) {
         const avatarY = 153;
         const avatarRadius = 104;
 
-        // Obramowanie
         ctx.save();
 
         ctx.beginPath();
+
         ctx.arc(
             avatarX,
             avatarY,
@@ -95,11 +97,10 @@ async function sendWelcomeMessage(member) {
 
         ctx.restore();
 
-        // Avatar
         const avatar = await Canvas
             .loadImage(avatarURL)
             .catch((error) => {
-                console.error('❌ Błąd pobierania avatara:', error);
+                console.error('❌ Nie udało się pobrać avatara:', error);
                 return null;
             });
 
@@ -107,6 +108,7 @@ async function sendWelcomeMessage(member) {
             ctx.save();
 
             ctx.beginPath();
+
             ctx.arc(
                 avatarX,
                 avatarY,
@@ -129,37 +131,35 @@ async function sendWelcomeMessage(member) {
         }
 
         // ==========================================
-        // NAZWA UŻYTKOWNIKA
+        // TEKST USERNAME
         // ==========================================
 
         ctx.save();
 
-        /*
-         * NIE używamy:
-         * ctx.textAlign = 'center'
-         *
-         * Środek obliczamy ręcznie.
-         */
+        // Ustawiamy DUŻĄ czcionkę.
+        // Używamy Liberation Sans, który instalujemy
+        // przez Aptfile na Renderze.
 
-        // Duży rozmiar początkowy
         let fontSize = 80;
-
-        // Maksymalna szerokość nicku
         const maxWidth = 850;
 
-        // DejaVu Sans jest bezpieczniejszy na Linux/Render
-        ctx.font = `bold ${fontSize}px "DejaVu Sans"`;
+        ctx.font = `bold ${fontSize}px "Liberation Sans"`;
+
+        // Prawdziwa wartość ustawionego fontu
+        console.log('🔤 Canvas ctx.font:', ctx.font);
 
         let textWidth = ctx.measureText(username).width;
 
-        // Zmniejszamy tylko jeśli nick jest naprawdę długi
+        console.log('📏 Początkowa szerokość:', textWidth);
+
+        // Zmniejszanie tylko dla bardzo długich nicków
         while (
             textWidth > maxWidth &&
             fontSize > 30
         ) {
             fontSize -= 2;
 
-            ctx.font = `bold ${fontSize}px "DejaVu Sans"`;
+            ctx.font = `bold ${fontSize}px "Liberation Sans"`;
 
             textWidth = ctx.measureText(username).width;
         }
@@ -172,16 +172,19 @@ async function sendWelcomeMessage(member) {
 
         const textX = centerX - (textWidth / 2);
 
-        // Pozycja pionowa
         const textY = 355;
 
         // ==========================================
-        // KOLOR
+        // BIAŁY KOLOR
         // ==========================================
 
-        // Bardzo ważne:
-        // ustawiamy kolor BEZPOŚREDNIO przed fillText
-        ctx.fillStyle = 'rgb(255, 255, 255)';
+        ctx.fillStyle = '#FFFFFF';
+
+        // Usuwamy wszelkie ewentualne ustawienia
+        // wpływające na kolor.
+
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
 
         // ==========================================
         // CIEŃ
@@ -193,7 +196,7 @@ async function sendWelcomeMessage(member) {
         ctx.shadowOffsetY = 3;
 
         // ==========================================
-        // TEKST
+        // RYSOWANIE
         // ==========================================
 
         ctx.fillText(
@@ -211,15 +214,15 @@ async function sendWelcomeMessage(member) {
         console.log('======================================');
         console.log('🖼️ WELCOME BANNER');
         console.log('👤 Username:', username);
-        console.log('🔤 Font:', `bold ${fontSize}px "DejaVu Sans"`);
+        console.log('🔤 RZECZYWISTY ctx.font:', ctx.font);
         console.log('📏 Text width:', textWidth);
         console.log('📍 Text X:', textX);
         console.log('📍 Text Y:', textY);
-        console.log('🎨 Text color: WHITE');
+        console.log('🎨 Text color: #FFFFFF');
         console.log('======================================');
 
         // ==========================================
-        // PNG
+        // OBRAZ
         // ==========================================
 
         const attachment = new AttachmentBuilder(
@@ -254,7 +257,9 @@ async function sendWelcomeMessage(member) {
             files: [attachment]
         });
 
-        console.log(`✅ Powitanie wysłane dla ${username}`);
+        console.log(
+            `✅ Powitanie wysłane dla ${username}`
+        );
 
     } catch (error) {
         console.error(
