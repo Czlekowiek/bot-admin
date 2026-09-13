@@ -16,29 +16,38 @@ const client = new Client({
 
 const CHANNEL_ID = '1548638166389366834';
 
+// Twoje role dopasowane do struktury
 const ROLES_TO_TRACK = [
-    { id: '1548633496220864624', name: '👑 Rola 1' },
-    { id: '1548633906969051156', name: '🛡️ Rola 2' },
-    { id: '1548633531482247188', name: '🔧 Rola 3' },
-    { id: '1548633569814122617', name: '⭐ Rola 4' }
+    { id: '1548633496220864624', name: 'Właściciel' },
+    { id: '1548633906969051156', name: 'Technik' },
+    { id: '1548633531482247188', name: 'Admin' },
+    { id: '1548633569814122617', name: 'Rola 4' } // Jeśli potrzebujesz też czwartej roli
 ];
 
 let targetMessage = null;
 
 async function generateEmbed(guild) {
-    const embed = new EmbedBuilder()
-        .setTitle('📋 Skład Administracji')
-        .setColor('#2b2d31')
-        .setTimestamp();
+    let descriptionText = '';
 
     for (const roleData of ROLES_TO_TRACK) {
         const role = await guild.roles.fetch(roleData.id).catch(() => null);
-        let membersList = 'Brak osób';
+        
+        let membersList = '<:arrow:1543977081233342494> Brak osób';
         if (role && role.members.size > 0) {
-            membersList = role.members.map(member => `<@${member.id}>`).join('\n');
+            membersList = role.members.map(member => `<:arrow:1543977081233342494> <@${member.id}>`).join('\n');
         }
-        embed.addFields({ name: roleData.name, value: membersList, inline: false });
+
+        descriptionText += `<a:dot:1543969325155745812> ${roleData.name}\n${membersList}\n\n`;
     }
+
+    const embed = new EmbedBuilder()
+        .setDescription(descriptionText.trim())
+        .setColor(16764416) // Żółtawy/bursztynowy kolor z Twojego wzoru
+        .setFooter({
+            text: 'Stworzone przez @czlekowiek',
+            icon_url: 'https://cdn.discordapp.com/attachments/1548638166389366834/1548644226399600680/czlekowiek-avatar-1024.png'
+        });
+
     return embed;
 }
 
@@ -48,17 +57,17 @@ async function updateAdminMessage(guild) {
         if (!channel) return console.log('Nie znaleziono kanału!');
 
         const newEmbed = await generateEmbed(guild);
+        const contentText = '<:staff:1548644739237027902> Skład Administracji';
 
         if (!targetMessage) {
-            // Pobierz ostatnie wiadomości z kanału, żeby sprawdzić czy bot już coś wysłał
             const messages = await channel.messages.fetch({ limit: 10 });
             targetMessage = messages.find(m => m.author.id === client.user.id);
         }
 
         if (targetMessage) {
-            await targetMessage.edit({ embeds: [newEmbed] });
+            await targetMessage.edit({ content: contentText, embeds: [newEmbed] });
         } else {
-            targetMessage = await channel.send({ embeds: [newEmbed] });
+            targetMessage = await channel.send({ content: contentText, embeds: [newEmbed] });
         }
         
         console.log('Zaktualizowano listę administracji!');
