@@ -1,0 +1,346 @@
+const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const Canvas = require('canvas');
+
+async function sendLeaveMessage(member) {
+    try {
+        // =========================================================
+        // KONFIGURACJA
+        // =========================================================
+
+        const LEAVE_CHANNEL_ID = '1542121319263641683';
+
+        const WIDTH = 1200;
+        const HEIGHT = 633;
+
+        const BACKGROUND_URL = 'https://iili.io/nqeNgnV.png';
+
+        // =========================================================
+        // KANAŁ POŻEGNAŃ
+        // =========================================================
+
+        const channel = await member.guild.channels
+            .fetch(LEAVE_CHANNEL_ID)
+            .catch(() => null);
+
+        if (!channel) {
+            console.error('❌ Nie znaleziono kanału pożegnań.');
+            return;
+        }
+
+        // =========================================================
+        // INFORMACJE O UŻYTKOWNIKU
+        // =========================================================
+
+        const memberCount = member.guild.memberCount;
+
+        // Username = nazwa konta Discord
+        const username = member.user.username;
+
+        // Display name = nazwa wyświetlana na serwerze
+        const displayName = member.displayName;
+
+        const serverName = member.guild.name;
+
+        // =========================================================
+        // DATA UTWORZENIA KONTA
+        // =========================================================
+
+        const createdAt = member.user.createdAt;
+
+        const formattedDate = createdAt
+            .toISOString()
+            .replace(/T/, ' ')
+            .replace(/\..+/, '');
+
+        // =========================================================
+        // CANVAS
+        // =========================================================
+
+        const canvas = Canvas.createCanvas(WIDTH, HEIGHT);
+        const ctx = canvas.getContext('2d');
+
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+
+        // =========================================================
+        // TŁO
+        // =========================================================
+
+        const background = await Canvas
+            .loadImage(BACKGROUND_URL)
+            .catch((error) => {
+                console.error('❌ Błąd pobierania tła:', error);
+                return null;
+            });
+
+        if (!background) {
+            console.error('❌ Nie udało się pobrać tła pożegnania.');
+            return;
+        }
+
+        ctx.drawImage(
+            background,
+            0,
+            0,
+            WIDTH,
+            HEIGHT
+        );
+
+        // =========================================================
+        // AVATAR
+        // =========================================================
+
+        const centerX = 600;
+        const centerY = 153;
+        const avatarRadius = 104;
+
+        const avatarURL = member.user.displayAvatarURL({
+            extension: 'png',
+            size: 512
+        });
+
+        const avatar = await Canvas
+            .loadImage(avatarURL)
+            .catch((error) => {
+                console.error('❌ Błąd pobierania avatara:', error);
+                return null;
+            });
+
+        if (avatar) {
+            ctx.save();
+
+            ctx.beginPath();
+
+            ctx.arc(
+                centerX,
+                centerY,
+                avatarRadius,
+                0,
+                Math.PI * 2
+            );
+
+            ctx.closePath();
+            ctx.clip();
+
+            ctx.drawImage(
+                avatar,
+                centerX - avatarRadius,
+                centerY - avatarRadius,
+                avatarRadius * 2,
+                avatarRadius * 2
+            );
+
+            ctx.restore();
+        } else {
+            console.warn('⚠️ Nie udało się pobrać avatara.');
+        }
+
+        // =========================================================
+        // TEKST NA OBRAZKU
+        // =========================================================
+
+        const NORMAL_FONT_SIZE = 85;
+
+        // Maksymalna szerokość nazwy
+        const MAX_TEXT_WIDTH = 850;
+
+        // Normalny tekst przesunięty o 2 px do góry
+        const NORMAL_TEXT_Y = 373;
+
+        // Długie nazwy są lekko wyżej
+        const LONG_TEXT_Y = 369;
+
+        // =========================================================
+        // ESCAPE ZNAKÓW DLA SVG
+        // =========================================================
+
+        const escapeXml = (text) => {
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;');
+        };
+
+        const safeUsername = escapeXml(username);
+
+        // =========================================================
+        // SPRAWDZANIE DŁUGOŚCI NAZWY
+        // =========================================================
+
+        let fontSize = NORMAL_FONT_SIZE;
+
+        const measureCanvas = Canvas.createCanvas(
+            1200,
+            200
+        );
+
+        const measureCtx = measureCanvas.getContext('2d');
+
+        measureCtx.font =
+            `900 ${fontSize}px "DejaVu Sans"`;
+
+        while (
+            measureCtx.measureText(username).width > MAX_TEXT_WIDTH &&
+            fontSize > 35
+        ) {
+            fontSize -= 2;
+
+            measureCtx.font =
+                `900 ${fontSize}px "DejaVu Sans"`;
+        }
+
+        // =========================================================
+        // POZYCJA TEKSTU
+        // =========================================================
+
+        const textY =
+            fontSize < NORMAL_FONT_SIZE
+                ? LONG_TEXT_Y
+                : NORMAL_TEXT_Y;
+
+        // =========================================================
+        // SVG Z TEKSTEM
+        // =========================================================
+
+        const textSvg = `
+<svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="${WIDTH}"
+    height="${HEIGHT}"
+    viewBox="0 0 ${WIDTH} ${HEIGHT}"
+>
+    <text
+        x="600"
+        y="${textY}"
+        text-anchor="middle"
+        dominant-baseline="middle"
+        fill="#FFFFFF"
+        fill-opacity="1"
+        stroke="none"
+        font-family="DejaVu Sans, Arial, sans-serif"
+        font-size="${fontSize}px"
+        font-weight="900"
+    >${safeUsername}</text>
+</svg>
+`;
+
+        // =========================================================
+        // RENDEROWANIE TEKSTU
+        // =========================================================
+
+        const textImage = await Canvas
+            .loadImage(
+                Buffer.from(textSvg, 'utf8')
+            )
+            .catch((error) => {
+                console.error(
+                    '❌ Błąd renderowania SVG:',
+                    error
+                );
+
+                return null;
+            });
+
+        if (!textImage) {
+            console.error(
+                '❌ Nie udało się utworzyć tekstu SVG.'
+            );
+
+            return;
+        }
+
+        // =========================================================
+        // WKLEJENIE TEKSTU NA BANER
+        // =========================================================
+
+        ctx.save();
+
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+
+        ctx.drawImage(
+            textImage,
+            0,
+            0,
+            WIDTH,
+            HEIGHT
+        );
+
+        ctx.restore();
+
+        // =========================================================
+        // DEBUG
+        // =========================================================
+
+        console.log('======================================');
+        console.log('👋 LEAVE BANNER');
+        console.log('👤 Username:', username);
+        console.log('👤 Display Name:', displayName);
+        console.log('🔠 Font size:', fontSize);
+        console.log('📍 X:', 600);
+        console.log('📍 Y:', textY);
+        console.log('🎨 Kolor: #FFFFFF');
+        console.log('🖼️ Tło:', background ? 'OK' : 'BRAK');
+        console.log('👤 Avatar:', avatar ? 'OK' : 'BRAK');
+        console.log('👥 Liczba członków:', memberCount);
+        console.log('======================================');
+
+        // =========================================================
+        // PNG
+        // =========================================================
+
+        const imageBuffer = canvas.toBuffer('image/png');
+
+        const attachment = new AttachmentBuilder(
+            imageBuffer,
+            {
+                name: 'leave-banner.png'
+            }
+        );
+
+        // =========================================================
+        // EMBED
+        // =========================================================
+
+        const embed = new EmbedBuilder()
+            .setColor(16764416)
+            .setDescription(
+                `### ${displayName}\n\n` +
+                `Pa! **${displayName}** opuścił **${serverName}**, ` +
+                `teraz mamy **${memberCount}** członków.`
+            )
+            .setImage('attachment://leave-banner.png')
+            .setFooter({
+                text: `Data utworzenia konta: ${formattedDate}`
+            });
+
+        // =========================================================
+        // WYSŁANIE
+        // =========================================================
+
+        await channel.send({
+            embeds: [embed],
+            files: [attachment]
+        });
+
+        console.log(
+            `👋 Pożegnanie wysłane dla ${displayName}`
+        );
+
+    } catch (error) {
+        console.error(
+            '❌ Błąd podczas generowania pożegnania:',
+            error
+        );
+    }
+}
+
+// =========================================================
+// EXPORT
+// =========================================================
+
+module.exports = {
+    sendLeaveMessage
+};
