@@ -15,27 +15,28 @@ async function sendWelcomeMessage(member) {
         const username = member.user.username;
         const serverName = member.guild.name;
 
-        // Układ 1:1 jak na wzorze (Awatar u góry na środku, nick, a pod nim podtytuł)
+        // Dokładne dopasowanie czcionki, brak licznika na banerze i prawidłowa nazwa serwera
         const card = await new WelcomeBuilder({
-            fontDefault: 'Inter',
+            fontDefault: 'Arial',
             backgroundImgURL: 'https://dreamtours.pl/img/uploads/1759222213_darlowo_z_lotu-Aq5e0Pjf7wSo.jpg',
             avatarImgURL: avatarURL,
             avatarBorderColor: '#ffffff',
             avatarBackgroundColor: '#1e1e1e',
-            overlayOpacity: 0.5, // Przyciemnienie tła, aby tekst i awatar były idealnie widoczne
+            blur: 2,
+            opacity: 0.6,
+            rounded: true,
             mainText: {
-                content: username, // Duży napis na środku (nazwa użytkownika jak na wzorze)
+                content: username,
                 color: '#ffffff',
                 size: 40
             },
             nicknameText: {
-                content: '', // Zostawiamy puste, żeby niedublować
-                color: '#ffffff',
+                content: '',
                 size: 0
             },
             secondText: {
-                content: `${serverName} • Jesteś ${memberCount} członkiem`, // Mniejszy napis pod spodem
-                color: '#cccccc',
+                content: 'Polskie Drogi Roleplay',
+                color: '#b0b0b0',
                 size: 22
             }
         }).build();
