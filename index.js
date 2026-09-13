@@ -20,13 +20,15 @@ const CHANNEL_IDS = [
     '1542122713676644352'
 ];
 
-// Ostateczna kolejność ról
+// Zaktualizowana lista ról uwzględniająca Moderatora i Junior Moderatora
 const ROLES_TO_TRACK = [
     { id: '1542127037202825326', name: '<:owner_gradient:1548652163272675452> Właściciel' },
     { id: '1542127233093869701', name: '<:admin_yellow:1548649419434627246> Współwłaściciel' },
     { id: '1543676695377215629', name: '<:admin_darkpurple:1548650402503852032> Technik' },
     { id: '1542128389274472458', name: '<:admin_red:1548649297724047450> Admin' },
     { id: '1542991925521420330', name: '<:admin_orange:1548649349834080327> Junior Admin' },
+    { id: '1548662787071279145', name: '<:admin_lightgreen:1548663391491592295> Moderator' },
+    { id: '1548662868960870502', name: '<:admin_green:1548649490964025446> Junior Moderator' },
     { id: '1542127336193785886', name: '<:admin_blue:1548649538389024768> Developer' },
     { id: '1543996411350098010', name: '<:admin_turquoise:1548650090703491153> Zarząd Frakcji' }
 ];
@@ -68,7 +70,7 @@ async function generateEmbed(guild) {
         .setColor(16764416)
         .setFooter({
             text: `Stworzone przez @czlekowiek • Ostatnia aktualizacja: ${formattedTime}`,
-            icon_url: 'https://cdn.discordapp.com/attachments/1548632923928797216/1548662139663818812/czlekowiek-avatar-1024.png?ex=6aa7df82&is=6aa68e02&hm=b8fbe435ed3fd7f1e9f544795cb3ed4b486f1f03a622ea1d918c90dc48025e7f&'
+            icon_url: 'https://cdn.discordapp.com/attachments/1548638166389366834/1548644226399600680/czlekowiek-avatar-1024.png'
         });
 
     return embed;
