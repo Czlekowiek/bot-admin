@@ -175,7 +175,7 @@ async function updateActivityBoard(message, usersList) {
     const embed = message.embeds[0];
     const description = embed.description;
 
-    const opisMatch = description.split(/Opis: /);
+    const opisMatch = description.split(/### Opis: /);
     const activityDescription = opisMatch[1] ? opisMatch[1] : null;
 
     const top1 = usersList[0] ? `<@${usersList[0]}>` : 'Brak';
@@ -185,7 +185,7 @@ async function updateActivityBoard(message, usersList) {
     let newDescription = `# <a:checkmark:1543969158646206475> Aktywność check\n## <a:top1:1548673656761352304> 1. ${top1}\n## <a:top2:1548673747983011891> 2. ${top2}\n## <a:top3:1548673801104138322> 3. ${top3}\n\n## <a:dot:1543969325155745812> Zareaguj emotką "<a:checkmark:1543969158646206475>" poniżej aby zaznaczyć aktywność.`;
 
     if (activityDescription) {
-        newDescription += `\n\nOpis: ${activityDescription}`;
+        newDescription += `\n\n### Opis: ${activityDescription}`;
     }
 
     const updatedEmbed = EmbedBuilder.from(embed).setDescription(newDescription);
