@@ -28,7 +28,7 @@ module.exports = {
             minute: '2-digit'
         });
 
-        let descriptionText = `# <a:checkmark:1543969158646206475> Aktywność check\n## <a:top1:1548673656761352304> 1. Brak\n## <a:top2:1548673747983011891> 2. Brak\n## <a:top3:1548673801104138322> 3. Brak\n\n## <a:dot:1543969325155745812> Zareaguj emotką "<a:checkmark:1543969158646206475>" poniżej aby zaznaczyć aktywność.`;
+        let descriptionText = `# Aktywność check\n## 1. Brak\n## 2. Brak\n## 3. Brak\n\n## Zareaguj emotką poniżej aby zaznaczyć aktywność.`;
 
         if (opis) {
             descriptionText += `\n\n### Opis: ${opis}`;
@@ -48,6 +48,6 @@ module.exports = {
 
         await sentMessage.react('1543969158646206475');
 
-        await interaction.reply({ content: `Pomyślnie utworzono wiadomość aktywności na kanale <#${channelId}>!`, ephemeral: true });
+        await interaction.reply({ content: 'Pomyślnie utworzono wiadomość aktywności.', ephemeral: true });
     },
 };
