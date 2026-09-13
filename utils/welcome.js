@@ -3,11 +3,9 @@ const Canvas = require('canvas');
 
 async function sendWelcomeMessage(member) {
     try {
-        const WELCOME_CHANNEL_ID = '1542121319263641682';
+        const CHANNEL_ID = '1542121319263641682';
 
-        const channel = await member.guild.channels
-            .fetch(WELCOME_CHANNEL_ID)
-            .catch(() => null);
+        const channel = await member.guild.channels.fetch(CHANNEL_ID).catch(() => null);
 
         if (!channel) {
             console.error('❌ Nie znaleziono kanału powitalnego.');
@@ -17,16 +15,6 @@ async function sendWelcomeMessage(member) {
         const username = member.user.username;
         const serverName = member.guild.name;
         const memberCount = member.guild.memberCount;
-
-        const formattedDate = member.user.createdAt
-            .toISOString()
-            .replace('T', ' ')
-            .replace(/\..+/, '');
-
-        const avatarURL = member.user.displayAvatarURL({
-            extension: 'png',
-            size: 512
-        });
 
         // ==========================================
         // CANVAS
@@ -39,46 +27,46 @@ async function sendWelcomeMessage(member) {
         // TŁO
         // ==========================================
 
-        const background = await Canvas
-            .loadImage('https://iili.io/nqND2ls.png')
-            .catch((error) => {
-                console.error('❌ Błąd ładowania tła:', error);
-                return null;
-            });
-
-        if (!background) return;
+        const background = await Canvas.loadImage(
+            'https://iili.io/nqND2ls.png'
+        );
 
         ctx.drawImage(
             background,
             0,
             0,
-            canvas.width,
-            canvas.height
+            1200,
+            633
         );
 
         // ==========================================
         // AVATAR
         // ==========================================
 
+        const avatarURL = member.user.displayAvatarURL({
+            extension: 'png',
+            size: 512
+        });
+
+        const avatar = await Canvas.loadImage(avatarURL).catch(() => null);
+
         const avatarX = 600;
         const avatarY = 153;
         const avatarRadius = 104;
 
+        // Obramowanie
         ctx.save();
 
         ctx.beginPath();
-
         ctx.arc(
             avatarX,
             avatarY,
-            avatarRadius + 6,
+            avatarRadius + 7,
             0,
             Math.PI * 2
         );
 
-        ctx.closePath();
-
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillStyle = '#000000';
         ctx.fill();
 
         ctx.lineWidth = 3;
@@ -87,22 +75,11 @@ async function sendWelcomeMessage(member) {
 
         ctx.restore();
 
-        // ==========================================
-        // AVATAR UŻYTKOWNIKA
-        // ==========================================
-
-        const avatar = await Canvas
-            .loadImage(avatarURL)
-            .catch((error) => {
-                console.error('❌ Błąd ładowania avatara:', error);
-                return null;
-            });
-
+        // Avatar
         if (avatar) {
             ctx.save();
 
             ctx.beginPath();
-
             ctx.arc(
                 avatarX,
                 avatarY,
@@ -110,8 +87,6 @@ async function sendWelcomeMessage(member) {
                 0,
                 Math.PI * 2
             );
-
-            ctx.closePath();
 
             ctx.clip();
 
@@ -130,40 +105,38 @@ async function sendWelcomeMessage(member) {
         // NAZWA UŻYTKOWNIKA
         // ==========================================
 
+        /*
+         * WAŻNE:
+         * Nie używamy:
+         * - ctx.scale()
+         * - transformacji
+         * - ręcznego skalowania tekstu
+         *
+         * Canvas dostaje normalny font i normalny fillText().
+         */
+
         const centerX = 600;
+        const centerY = 390;
 
-        // Tekst był trochę za wysoko,
-        // więc przesuwamy go niżej.
-        const textY = 390;
-
-        // Większa czcionka
-        let fontSize = 110;
-
-        const maxWidth = 850;
+        let fontSize = 100;
 
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        // ==========================================
-        // DOBIERANIE ROZMIARU
-        // ==========================================
+        // Dobieramy rozmiar tylko na podstawie normalnego
+        // measureText().
+        ctx.font = `bold ${fontSize}px DejaVu Sans`;
 
-        ctx.font = `bold ${fontSize}px "DejaVu Sans"`;
-
-        let textWidth = ctx.measureText(username).width;
-
-        // Jeżeli nick jest bardzo długi,
-        // zmniejszamy czcionkę.
-        while (textWidth > maxWidth && fontSize > 30) {
+        while (
+            ctx.measureText(username).width > 850 &&
+            fontSize > 30
+        ) {
             fontSize -= 2;
-
-            ctx.font = `bold ${fontSize}px "DejaVu Sans"`;
-
-            textWidth = ctx.measureText(username).width;
+            ctx.font = `bold ${fontSize}px DejaVu Sans`;
         }
 
         // ==========================================
-        // RESET USTAWIEŃ
+        // CZYSZCZENIE USTAWIEŃ
         // ==========================================
 
         ctx.globalAlpha = 1;
@@ -177,30 +150,24 @@ async function sendWelcomeMessage(member) {
         // BIAŁY TEKST
         // ==========================================
 
-        ctx.fillStyle = '#FFFFFF';
-
-        ctx.font = `bold ${fontSize}px "DejaVu Sans"`;
-
+        ctx.font = `bold ${fontSize}px DejaVu Sans`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
-        // ==========================================
-        // CZARNY CIEŃ
-        // ==========================================
-
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
-        ctx.shadowBlur = 5;
+        // Bardzo delikatny cień
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        ctx.shadowBlur = 6;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 3;
 
-        // ==========================================
-        // RYSOWANIE TEKSTU
-        // ==========================================
+        // KLUCZOWE:
+        // biały kolor ustawiamy bezpośrednio przed fillText
+        ctx.fillStyle = 'white';
 
         ctx.fillText(
             username,
             centerX,
-            textY
+            centerY
         );
 
         // ==========================================
@@ -211,22 +178,33 @@ async function sendWelcomeMessage(member) {
         console.log('🖼️ WELCOME BANNER');
         console.log('👤 Username:', username);
         console.log('🔠 Font:', ctx.font);
-        console.log('📏 Text width:', textWidth);
+        console.log('📏 Width:', ctx.measureText(username).width);
         console.log('📍 X:', centerX);
-        console.log('📍 Y:', textY);
-        console.log('🎨 fillStyle:', ctx.fillStyle);
+        console.log('📍 Y:', centerY);
+        console.log('🎨 Color:', ctx.fillStyle);
         console.log('======================================');
 
         // ==========================================
-        // ZAŁĄCZNIK
+        // PNG
         // ==========================================
 
+        const buffer = canvas.toBuffer('image/png');
+
         const attachment = new AttachmentBuilder(
-            canvas.toBuffer('image/png'),
+            buffer,
             {
                 name: 'welcome-banner.png'
             }
         );
+
+        // ==========================================
+        // DATA KONTA
+        // ==========================================
+
+        const formattedDate = member.user.createdAt
+            .toISOString()
+            .replace('T', ' ')
+            .replace(/\..+/, '');
 
         // ==========================================
         // EMBED
@@ -244,10 +222,6 @@ async function sendWelcomeMessage(member) {
                 text: `Data utworzenia konta: ${formattedDate}`
             });
 
-        // ==========================================
-        // WYSYŁANIE
-        // ==========================================
-
         await channel.send({
             embeds: [embed],
             files: [attachment]
@@ -259,7 +233,7 @@ async function sendWelcomeMessage(member) {
 
     } catch (error) {
         console.error(
-            '❌ Błąd podczas generowania powitania:',
+            '❌ Błąd welcome:',
             error
         );
     }
