@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 const http = require('http');
 
 const server = http.createServer((req, res) => {
@@ -31,8 +31,7 @@ const ROLES_TO_TRACK = [
     { id: '1543996411350098010', name: '<:admin_turquoise:1548650090703491153> Zarząd Frakcji' }
 ];
 
-async function generateEmbedAndFiles() {
-    const guild = client.guilds.cache.first();
+async function generateEmbed(guild) {
     if (guild) {
         await guild.members.fetch().catch(() => {});
     }
@@ -64,23 +63,20 @@ async function generateEmbedAndFiles() {
         second: '2-digit'
     });
 
-    // Tworzenie załącznika z bezpośredniego linku graficznego
-    const file = new AttachmentBuilder('https://cdn.discordapp.com/attachments/1548638166389366834/1548644226399600680/czlekowiek-avatar-1024.png', { name: 'avatar.png' });
-
     const embed = new EmbedBuilder()
         .setDescription(descriptionText.trim())
         .setColor(16764416)
         .setFooter({
             text: `Stworzone przez @czlekowiek • Ostatnia aktualizacja: ${formattedTime}`,
-            icon_url: 'attachment://avatar.png' // Odwołanie do lokalnie załączonego pliku
+            icon_url: 'https://cdn.discordapp.com/attachments/1548638166389366834/1548644226399600680/czlekowiek-avatar-1024.png'
         });
 
-    return { embeds: [embed], files: [file] };
+    return embed;
 }
 
 async function updateAdminMessage(guild) {
     try {
-        const messagePayload = await generateEmbedAndFiles();
+        const newEmbed = await generateEmbed(guild);
 
         for (const channelId of CHANNEL_IDS) {
             const channel = await guild.channels.fetch(channelId).catch(() => null);
@@ -93,9 +89,9 @@ async function updateAdminMessage(guild) {
             let botMessage = messages ? messages.find(m => m.author.id === client.user.id) : null;
 
             if (botMessage) {
-                await botMessage.edit({ content: null, embeds: messagePayload.embeds, files: messagePayload.files });
+                await botMessage.edit({ content: null, embeds: [newEmbed] });
             } else {
-                await channel.send({ embeds: messagePayload.embeds, files: messagePayload.files });
+                await channel.send({ embeds: [newEmbed] });
             }
         }
         
