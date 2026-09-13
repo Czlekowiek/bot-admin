@@ -135,6 +135,7 @@ async function updateActivityBoard(message) {
     const reaction = message.reactions.cache.get('1543969158646206475');
     if (!reaction) return;
 
+    // Pobieramy użytkowników z API
     const users = await reaction.users.fetch({ limit: 100 });
     
     const humanUsers = [];
@@ -144,6 +145,7 @@ async function updateActivityBoard(message) {
         }
     }
 
+    // Pierwsza osoba która kliknęła jest na indeksie 0
     const top1 = humanUsers[0] ? `<@${humanUsers[0].id}>` : 'Brak';
     const top2 = humanUsers[1] ? `<@${humanUsers[1].id}>` : 'Brak';
     const top3 = humanUsers[2] ? `<@${humanUsers[2].id}>` : 'Brak';
