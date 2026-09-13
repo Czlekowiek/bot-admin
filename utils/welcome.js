@@ -42,7 +42,7 @@ async function sendWelcomeMessage(member) {
         const background = await Canvas
             .loadImage('https://iili.io/nqND2ls.png')
             .catch((error) => {
-                console.error('❌ Nie udało się załadować tła:', error);
+                console.error('❌ Błąd ładowania tła:', error);
                 return null;
             });
 
@@ -52,8 +52,8 @@ async function sendWelcomeMessage(member) {
             background,
             0,
             0,
-            1200,
-            633
+            canvas.width,
+            canvas.height
         );
 
         // ==========================================
@@ -94,7 +94,7 @@ async function sendWelcomeMessage(member) {
         const avatar = await Canvas
             .loadImage(avatarURL)
             .catch((error) => {
-                console.error('❌ Nie udało się załadować avatara:', error);
+                console.error('❌ Błąd ładowania avatara:', error);
                 return null;
             });
 
@@ -132,14 +132,14 @@ async function sendWelcomeMessage(member) {
 
         const centerX = 600;
 
-        // To możesz później zmienić,
-        // jeżeli będziemy chcieli przesunąć tekst.
-        const textY = 375;
+        // Tekst był trochę za wysoko,
+        // więc przesuwamy go niżej.
+        const textY = 390;
+
+        // Większa czcionka
+        let fontSize = 110;
 
         const maxWidth = 850;
-
-        // Zaczynamy od 80 px
-        let fontSize = 80;
 
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -148,22 +148,22 @@ async function sendWelcomeMessage(member) {
         // DOBIERANIE ROZMIARU
         // ==========================================
 
-        while (fontSize > 20) {
+        ctx.font = `bold ${fontSize}px "DejaVu Sans"`;
+
+        let textWidth = ctx.measureText(username).width;
+
+        // Jeżeli nick jest bardzo długi,
+        // zmniejszamy czcionkę.
+        while (textWidth > maxWidth && fontSize > 30) {
+            fontSize -= 2;
+
             ctx.font = `bold ${fontSize}px "DejaVu Sans"`;
 
-            const width = ctx.measureText(username).width;
-
-            if (width <= maxWidth) {
-                break;
-            }
-
-            fontSize -= 2;
+            textWidth = ctx.measureText(username).width;
         }
 
-        const textWidth = ctx.measureText(username).width;
-
         // ==========================================
-        // RESET CANVAS
+        // RESET USTAWIEŃ
         // ==========================================
 
         ctx.globalAlpha = 1;
@@ -174,14 +174,10 @@ async function sendWelcomeMessage(member) {
         ctx.shadowOffsetY = 0;
 
         // ==========================================
-        // BARDZO WAŻNE
+        // BIAŁY TEKST
         // ==========================================
 
-        // NIE używamy ctx.scale()
-        // NIE używamy transformacji
-        // Kolor ustawiamy bezpośrednio przed fillText()
-
-        ctx.fillStyle = 'rgb(255, 255, 255)';
+        ctx.fillStyle = '#FFFFFF';
 
         ctx.font = `bold ${fontSize}px "DejaVu Sans"`;
 
@@ -189,16 +185,16 @@ async function sendWelcomeMessage(member) {
         ctx.textBaseline = 'middle';
 
         // ==========================================
-        // DELIKATNY CZARNY CIEŃ
+        // CZARNY CIEŃ
         // ==========================================
 
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-        ctx.shadowBlur = 4;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+        ctx.shadowBlur = 5;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 3;
 
         // ==========================================
-        // BIAŁY TEKST
+        // RYSOWANIE TEKSTU
         // ==========================================
 
         ctx.fillText(
@@ -219,7 +215,6 @@ async function sendWelcomeMessage(member) {
         console.log('📍 X:', centerX);
         console.log('📍 Y:', textY);
         console.log('🎨 fillStyle:', ctx.fillStyle);
-        console.log('🔄 transform: BRAK');
         console.log('======================================');
 
         // ==========================================
@@ -264,7 +259,7 @@ async function sendWelcomeMessage(member) {
 
     } catch (error) {
         console.error(
-            '❌ Błąd podczas generowania i wysyłania powitania:',
+            '❌ Błąd podczas generowania powitania:',
             error
         );
     }
