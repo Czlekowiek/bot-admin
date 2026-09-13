@@ -15,7 +15,6 @@ const client = new Client({
 });
 
 const CHANNEL_ID = '1548638166389366834';
-const MESSAGE_ID = '1548638486343450685';
 
 const ROLES_TO_TRACK = [
     { id: '1548633496220864624', name: '👑 Rola 1' },
@@ -23,6 +22,8 @@ const ROLES_TO_TRACK = [
     { id: '1548633531482247188', name: '🔧 Rola 3' },
     { id: '1548633569814122617', name: '⭐ Rola 4' }
 ];
+
+let targetMessage = null;
 
 async function generateEmbed(guild) {
     const embed = new EmbedBuilder()
@@ -46,11 +47,20 @@ async function updateAdminMessage(guild) {
         const channel = await guild.channels.fetch(CHANNEL_ID).catch(() => null);
         if (!channel) return console.log('Nie znaleziono kanału!');
 
-        const message = await channel.messages.fetch(MESSAGE_ID).catch(() => null);
-        if (!message) return console.log('Nie znaleziono wiadomości o podanym ID!');
-
         const newEmbed = await generateEmbed(guild);
-        await message.edit({ embeds: [newEmbed], content: '' }); 
+
+        if (!targetMessage) {
+            // Pobierz ostatnie wiadomości z kanału, żeby sprawdzić czy bot już coś wysłał
+            const messages = await channel.messages.fetch({ limit: 10 });
+            targetMessage = messages.find(m => m.author.id === client.user.id);
+        }
+
+        if (targetMessage) {
+            await targetMessage.edit({ embeds: [newEmbed] });
+        } else {
+            targetMessage = await channel.send({ embeds: [newEmbed] });
+        }
+        
         console.log('Zaktualizowano listę administracji!');
     } catch (error) {
         console.error('Błąd podczas aktualizacji wiadomości:', error);
