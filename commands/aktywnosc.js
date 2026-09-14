@@ -42,7 +42,7 @@ module.exports = {
             });
 
         const sentMessage = await channel.send({
-            content: '# Testowa wiadomość!!!!',
+            content: '@everyone @here',
             embeds: [embed]
         });
 
