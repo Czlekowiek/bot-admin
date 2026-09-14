@@ -75,11 +75,9 @@ async function pobierzLubOdzyskajDowod(interaction, userId) {
     const kanalDowodow = await interaction.guild.channels.fetch(dowodModule.KANAL_DOWODOW).catch(() => null);
     if (!kanalDowodow) return null;
 
-    // Pobieramy do 100 ostatnich wiadomości z kanału dowodów
     const messages = await kanalDowodow.messages.fetch({ limit: 100 }).catch(() => null);
     if (!messages) return null;
 
-    // Szukamy wiadomości, która zawiera ID użytkownika
     const msg = messages.find(m => m.content.includes(userId));
 
     if (msg) {
@@ -287,7 +285,12 @@ client.on('interactionCreate', async interaction => {
         }
 
         if (podkomenda === 'edytuj') {
-            const istniejacyDowod = await pobierzLubOdzyskajDowod(interaction, userId);
+            let istniejacyDowod = dowodModule.dowodyDB.get(userId);
+
+            if (!istniejacyDowod) {
+                istniejacyDowod = await pobierzLubOdzyskajDowod(interaction, userId);
+            }
+
             if (!istniejacyDowod) {
                 return interaction.reply({ content: '❌ Nie masz jeszcze swojego dowodu osobistego, więc nie masz czego edytować.', ephemeral: true });
             }
@@ -310,7 +313,12 @@ client.on('interactionCreate', async interaction => {
         }
 
         if (podkomenda === 'usun') {
-            const istniejacyDowod = await pobierzLubOdzyskajDowod(interaction, userId);
+            let istniejacyDowod = dowodModule.dowodyDB.get(userId);
+
+            if (!istniejacyDowod) {
+                istniejacyDowod = await pobierzLubOdzyskajDowod(interaction, userId);
+            }
+
             if (!istniejacyDowod) {
                 return interaction.reply({ content: '❌ Nie posiadasz aktywnego dowodu.', ephemeral: true });
             }
