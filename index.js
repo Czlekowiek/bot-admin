@@ -55,14 +55,39 @@ const client = new Client({
 });
 
 // =========================================================
-// MODUŁ DOWODÓW OSOBISTYCH
+// BAZA DANYCH DOWODÓW (PLIK JSON)
 // =========================================================
+
+const dowodyFilePath = path.join(__dirname, 'dowody.json');
+
+function loadDowodyDB() {
+    if (fs.existsSync(dowodyFilePath)) {
+        try {
+            const data = fs.readFileSync(dowodyFilePath, 'utf8');
+            const parsed = JSON.parse(data);
+            return new Map(Object.entries(parsed));
+        } catch (e) {
+            console.error('Błąd podczas wczytywania pliku dowody.json:', e);
+            return new Map();
+        }
+    }
+    return new Map();
+}
+
+function saveDowodyDB(dbMap) {
+    try {
+        const obj = Object.fromEntries(dbMap);
+        fs.writeFileSync(dowodyFilePath, JSON.stringify(obj, null, 2), 'utf8');
+    } catch (e) {
+        console.error('Błąd podczas zapisywania pliku dowody.json:', e);
+    }
+}
 
 const dowodModule = {
     name: 'dowod',
     tymczasoweDane: new Map(),
     wnioskiDB: new Map(),
-    dowodyDB: new Map(),
+    dowodyDB: loadDowodyDB(), // Ładowanie trwałe przy starcie
     KANAL_WNIOSKOW: '1549106534561218722',
     KANAL_DOWODOW: '1548821312166699028'
 };
@@ -517,6 +542,7 @@ client.on('interactionCreate', async interaction => {
             linkWiadomosci: wyslanaWiadomosc.url,
             dane
         });
+        saveDowodyDB(dowodModule.dowodyDB); // Zapis do pliku JSON
 
         dowodModule.wnioskiDB.delete(interaction.message.id);
         
@@ -532,7 +558,7 @@ client.on('interactionCreate', async interaction => {
         if (!istniejacyDowod) return interaction.reply({ content: 'Użytkownik nie ma aktywnego dowodu.', ephemeral: true });
 
         const kanałDowodow = await interaction.guild.channels.fetch(dowodModule.KANAL_DOWODOW).catch(() => null);
-        const staryWpis = await kanałDowodow.messages.fetch(istniejacyDowod.wiadomoscId).catch(() => null);
+        const staryWpis = kanałDowodow ? await kanałDowodow.messages.fetch(istniejacyDowod.wiadomoscId).catch(() => null) : null;
 
         const dane = wniosek.dane;
         const nowyTekst = `🪪 DOWÓD OSOBISTY (<@${targetUserId}>) | OBYWATEL POLSKICH DRÓG \n\n` +
@@ -550,6 +576,8 @@ client.on('interactionCreate', async interaction => {
         }
 
         istniejacyDowod.dane = dane;
+        saveDowodyDB(dowodModule.dowodyDB); // Zapis do pliku JSON
+
         dowodModule.wnioskiDB.delete(interaction.message.id);
 
         embed.setColor(0x2ecc71); // Zielony
@@ -563,9 +591,10 @@ client.on('interactionCreate', async interaction => {
         const istniejacyDowod = dowodModule.dowodyDB.get(targetUserId);
         if (istniejacyDowod) {
             const kanałDowodow = await interaction.guild.channels.fetch(dowodModule.KANAL_DOWODOW).catch(() => null);
-            const staryWpis = await kanałDowodow.messages.fetch(istniejacyDowod.wiadomoscId).catch(() => null);
+            const staryWpis = kanałDowodow ? await kanałDowodow.messages.fetch(istniejacyDowod.wiadomoscId).catch(() => null) : null;
             if (staryWpis) await staryWpis.delete().catch(() => {});
             dowodModule.dowodyDB.delete(targetUserId);
+            saveDowodyDB(dowodModule.dowodyDB); // Zapis do pliku JSON
         }
 
         dowodModule.wnioskiDB.delete(interaction.message.id);
