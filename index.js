@@ -607,7 +607,7 @@ async function updateActivityBoard(
 }
 
 // =========================================================
-// OBSŁUGA MODALI DOWODÓW
+// OBSŁUGA MODALI DOWODÓW (KROK 1 -> KROK 2 oraz FINAŁ)
 // =========================================================
 
 client.on('interactionCreate', async interaction => {
@@ -617,56 +617,193 @@ client.on('interactionCreate', async interaction => {
     if (!dowodModule) return;
 
     const userId = interaction.user.id;
-    const userTag = interaction.user.tag;
 
-    if (interaction.customId === 'modal_dowod_stworz') {
+    // Krok 1 (Tworzenie) -> Zapisujemy dane i pytamy o krok 2 przez kolejny modal lub przycisk
+    // Ponieważ Discord nie pozwala otworzyć modala z poziomu innego modala, używamy wiadomości z przyciskiem do 2. kroku!
+    if (interaction.customId === 'modal_dowod_krok1' || interaction.customId === 'modal_dowod_edytuj_krok1') {
+        const isEdit = interaction.customId.includes('edytuj');
+
         const imie = interaction.fields.getTextInputValue('imie');
         const data_ur = interaction.fields.getTextInputValue('data_ur');
         const miejsce_ur = interaction.fields.getTextInputValue('miejsce_ur');
         const plec = interaction.fields.getTextInputValue('plec');
-        const roblox = interaction.fields.getTextInputValue('roblox');
+        const praca = interaction.fields.getTextInputValue('praca');
 
-        const channel = await interaction.guild.channels.fetch(dowodModule.KANAL_WNIOSKOW).catch(() => null);
-        if (!channel) return interaction.reply({ content: 'Błąd kanału wniosków.', ephemeral: true });
-
-        const embed = new EmbedBuilder()
-            .setTitle('Nowy wniosek o dowód osobisty')
-            .setDescription(`**Właściciel:** <@${userId}>\n\n**Imię i Nazwisko:** ${imie}\n**Data urodzenia:** ${data_ur}\n**Miejsce urodzenia:** ${miejsce_ur}\n**Płeć:** ${plec}\n**Nick Roblox:** ${roblox}\n**Nick Discord:** ${userTag}\n**Aktualna praca:** Brak`);
+        // Zapisujemy tymczasowo dane 1. kroku
+        dowodModule.tymczasoweDane.set(userId, { imie, data_ur, miejsce_ur, plec, praca, isEdit });
 
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`dowod_akceptuj_stworz_${userId}`).setLabel('Akceptuj').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId(`dowod_odrzuc_stworz_${userId}`).setLabel('Odrzuć').setStyle(ButtonStyle.Danger)
+            new ButtonBuilder().setCustomId(`dowod_kontynuuj_${userId}`).setLabel('Przejdź do kroku 2 (Roblox/Discord)').setStyle(ButtonStyle.Primary)
         );
 
-        const msg = await channel.send({ embeds: [embed], components: [row] });
-        dowodModule.wnioskiDB.set(msg.id, { type: 'stworz', userId, dane: { imie, data_ur, miejsce_ur, plec, roblox, discord: userTag, praca: 'Brak' } });
-
-        return interaction.reply({ content: 'Wniosek o dowód został wysłany do administracji!', ephemeral: true });
+        return interaction.reply({ content: '✅ Zapisano pierwszy krok! Kliknij poniższy przycisk, aby uzupełnić drugą część formularza.', components: [row], ephemeral: true });
     }
 
-    if (interaction.customId === 'modal_dowod_edytuj') {
-        const imie = interaction.fields.getTextInputValue('imie');
-        const data_ur = interaction.fields.getTextInputValue('data_ur');
-        const miejsce_ur = interaction.fields.getTextInputValue('miejsce_ur');
-        const plec = interaction.fields.getTextInputValue('plec');
+    // Krok 2 (Finał po drugim modalu)
+    if (interaction.customId === 'modal_dowod_krok2' || interaction.customId === 'modal_dowod_edytuj_krok2') {
+        const isEdit = interaction.customId.includes('edytuj');
+        const dane1 = dowodModule.tymczasoweDane.get(userId);
+
+        if (!dane1) {
+            return interaction.reply({ content: '❌ Wygasły dane z pierwszego kroku. Zacznij od nowa.', ephemeral: true });
+        }
+
         const roblox = interaction.fields.getTextInputValue('roblox');
+        const discordNick = interaction.fields.getTextInputValue('discord');
 
         const channel = await interaction.guild.channels.fetch(dowodModule.KANAL_WNIOSKOW).catch(() => null);
         if (!channel) return interaction.reply({ content: 'Błąd kanału wniosków.', ephemeral: true });
 
+        const typWniosku = isEdit ? 'Wniosek o edycję dowodu osobistego' : 'Nowy wniosek o dowód osobisty';
+        const akcjaTyp = isEdit ? 'edytuj' : 'stworz';
+
         const embed = new EmbedBuilder()
-            .setTitle('Wniosek o edycję dowodu osobistego')
-            .setDescription(`**Właściciel:** <@${userId}>\n\n**Nowe Imię i Nazwisko:** ${imie}\n**Nowa data urodzenia:** ${data_ur}\n**Nowe miejsce urodzenia:** ${miejsce_ur}\n**Nowa płeć:** ${plec}\n**Nowy Nick Roblox:** ${roblox}\n**Nowy Nick Discord:** ${userTag}\n**Nowa praca:** Brak`);
+            .setTitle(typWniosku)
+            .setDescription(`**Właściciel:** <@${userId}>\n\n` +
+                `**Imię i Nazwisko:** ${dane1.imie}\n` +
+                `**Data urodzenia:** ${dane1.data_ur}\n` +
+                `**Miejsce urodzenia:** ${dane1.miejsce_ur}\n` +
+                `**Płeć:** ${dane1.plec}\n` +
+                `**Nick Roblox:** ${roblox}\n` +
+                `**Nick Discord:** ${discordNick}\n` +
+                `**Aktualna praca:** ${dane1.praca}`);
 
         const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`dowod_akceptuj_edytuj_${userId}`).setLabel('Akceptuj').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId(`dowod_odrzuc_edytuj_${userId}`).setLabel('Odrzuć').setStyle(ButtonStyle.Danger)
+            new ButtonBuilder().setCustomId(`dowod_akceptuj_${akcjaTyp}_${userId}`).setLabel('Akceptuj').setStyle(ButtonStyle.Success),
+            new ButtonBuilder().setCustomId(`dowod_odrzuc_${akcjaTyp}_${userId}`).setLabel('Odrzuć').setStyle(ButtonStyle.Danger)
         );
 
+        const pelneDane = { ...dane1, roblox, discord: discordNick };
         const msg = await channel.send({ embeds: [embed], components: [row] });
-        dowodModule.wnioskiDB.set(msg.id, { type: 'edytuj', userId, dane: { imie, data_ur, miejsce_ur, plec, roblox, discord: userTag, praca: 'Brak' } });
+        dowodModule.wnioskiDB.set(msg.id, { type: akcjaTyp, userId, dane: pelneDane });
+        dowodModule.tymczasoweDane.delete(userId);
 
-        return interaction.reply({ content: 'Wniosek o edycję dowodu został wysłany do administracji!', ephemeral: true });
+        return interaction.reply({ content: '🎉 Wniosek został w pełni uzupełniony i wysłany do administracji!', ephemeral: true });
+    }
+});
+
+// Obsługa przycisku otwierającego 2. modal oraz przycisków administracyjnych
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isButton()) return;
+    const dowodModule = client.commands.get('dowod');
+    if (!dowodModule) return;
+
+    // Kliknięcie przycisku "Przejdź do kroku 2" przez użytkownika
+    if (interaction.customId.startsWith('dowod_kontynuuj_')) {
+        const targetId = interaction.customId.split('_')[2];
+        if (interaction.user.id !== targetId) {
+            return interaction.reply({ content: '❌ To nie jest Twój formularz!', ephemeral: true });
+        }
+
+        const dane1 = dowodModule.tymczasoweDane.get(targetId);
+        const isEdit = dane1 ? dane1.isEdit : false;
+
+        const modal = new ModalBuilder()
+            .setCustomId(isEdit ? 'modal_dowod_edytuj_krok2' : 'modal_dowod_krok2')
+            .setTitle('Dowód: Nicki (2/2)');
+
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('roblox').setLabel('Nick Roblox').setStyle(TextInputStyle.Short).setRequired(true)),
+            new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('discord').setLabel('Nick Discord').setStyle(TextInputStyle.Short).setRequired(true))
+        );
+
+        return await interaction.showModal(modal);
+    }
+
+    // Obsługa przycisków administracyjnych (Akceptuj / Odrzuć)
+    if (!interaction.customId.startsWith('dowod_')) return;
+
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        return interaction.reply({ content: '❌ Nie masz uprawnień administratora do obsługi tego wniosku.', ephemeral: true });
+    }
+
+    const parts = interaction.customId.split('_');
+    const akcja = parts[1]; // akceptuj, odrzuc, usun
+    const typ = parts[2];   // stworz, edytuj, tak, nie
+    const targetUserId = parts[3];
+
+    const wniosek = dowodModule.wnioskiDB.get(interaction.message.id);
+
+    if (akcja === 'odrzuc' || (akcja === 'usun' && typ === 'nie')) {
+        dowodModule.wnioskiDB.delete(interaction.message.id);
+        await interaction.message.delete().catch(() => {});
+
+        try {
+            const user = await client.users.fetch(targetUserId);
+            await user.send('Twoja prośba dotycząca dowodu osobistego została odrzucona przez administrację.');
+        } catch (e) {}
+
+        return interaction.reply({ content: 'Odrzucono wniosek.', ephemeral: true });
+    }
+
+    if (akcja === 'akceptuj' && typ === 'stworz') {
+        const kanałDowodow = await interaction.guild.channels.fetch(dowodModule.KANAL_DOWODOW).catch(() => null);
+        if (!kanałDowodow) return interaction.reply({ content: 'Nie znaleziono kanału docelowego dowodów.', ephemeral: true });
+
+        const dane = wniosek.dane;
+        const tekstDowodu = `🪪 DOWÓD OSOBISTY (<@${targetUserId}>) | OBYWATEL POLSKICH DRÓG \n\n` +
+            `**Dane Osobowe**\n` +
+            `Imię i Nazwisko: ${dane.imie}\n` +
+            `Data urodzenia: ${dane.data_ur}\n` +
+            `Miejsce urodzenia: ${dane.miejsce_ur}\n` +
+            `Płeć: (M/K) ${dane.plec}\n` +
+            `Nick Roblox: ${dane.roblox}\n` +
+            `Nick Discord: ${dane.discord}\n` +
+            `Aktualna praca: ${dane.praca}`;
+
+        const wyslanaWiadomosc = await kanałDowodow.send(tekstDowodu);
+
+        dowodModule.dowodyDB.set(targetUserId, {
+            wiadomoscId: wyslanaWiadomosc.id,
+            linkWiadomosci: wyslanaWiadomosc.url,
+            dane
+        });
+
+        dowodModule.wnioskiDB.delete(interaction.message.id);
+        await interaction.message.delete().catch(() => {});
+        return interaction.reply({ content: 'Zaakceptowano wniosek i utworzono dowód.', ephemeral: true });
+    }
+
+    if (akcja === 'akceptuj' && typ === 'edytuj') {
+        const istniejacyDowod = dowodModule.dowodyDB.get(targetUserId);
+        if (!istniejacyDowod) return interaction.reply({ content: 'Użytkownik nie ma aktywnego dowodu.', ephemeral: true });
+
+        const kanałDowodow = await interaction.guild.channels.fetch(dowodModule.KANAL_DOWODOW).catch(() => null);
+        const staryWpis = await kanałDowodow.messages.fetch(istniejacyDowod.wiadomoscId).catch(() => null);
+
+        const dane = wniosek.dane;
+        const nowyTekst = `🪪 DOWÓD OSOBISTY (<@${targetUserId}>) | OBYWATEL POLSKICH DRÓG \n\n` +
+            `**Dane Osobowe**\n` +
+            `Imię i Nazwisko: ${dane.imie}\n` +
+            `Data urodzenia: ${dane.data_ur}\n` +
+            `Miejsce urodzenia: ${dane.miejsce_ur}\n` +
+            `Płeć: (M/K) ${dane.plec}\n` +
+            `Nick Roblox: ${dane.roblox}\n` +
+            `Nick Discord: ${dane.discord}\n` +
+            `Aktualna praca: ${dane.praca}`;
+
+        if (staryWpis) {
+            await staryWpis.edit(nowyTekst);
+        }
+
+        istniejacyDowod.dane = dane;
+        dowodModule.wnioskiDB.delete(interaction.message.id);
+        await interaction.message.delete().catch(() => {});
+        return interaction.reply({ content: 'Zaktualizowano dowód użytkownika.', ephemeral: true });
+    }
+
+    if (akcja === 'usun' && typ === 'tak') {
+        const istniejacyDowod = dowodModule.dowodyDB.get(targetUserId);
+        if (istniejacyDowod) {
+            const kanałDowodow = await interaction.guild.channels.fetch(dowodModule.KANAL_DOWODOW).catch(() => null);
+            const staryWpis = await kanałDowodow.messages.fetch(istniejacyDowod.wiadomoscId).catch(() => null);
+            if (staryWpis) await staryWpis.delete().catch(() => {});
+            dowodModule.dowodyDB.delete(targetUserId);
+        }
+
+        dowodModule.wnioskiDB.delete(interaction.message.id);
+        await interaction.message.delete().catch(() => {});
+        return interaction.reply({ content: 'Usunięto dowód użytkownika.', ephemeral: true });
     }
 });
 
