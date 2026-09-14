@@ -617,20 +617,21 @@ client.on('interactionCreate', async interaction => {
     if (!dowodModule) return;
 
     const userId = interaction.user.id;
+    const userTag = interaction.user.tag;
 
     if (interaction.customId === 'modal_dowod_stworz') {
         const imie = interaction.fields.getTextInputValue('imie');
         const data_ur = interaction.fields.getTextInputValue('data_ur');
         const miejsce_ur = interaction.fields.getTextInputValue('miejsce_ur');
         const plec = interaction.fields.getTextInputValue('plec');
-        const praca = interaction.fields.getTextInputValue('praca');
+        const roblox = interaction.fields.getTextInputValue('roblox');
 
         const channel = await interaction.guild.channels.fetch(dowodModule.KANAL_WNIOSKOW).catch(() => null);
         if (!channel) return interaction.reply({ content: 'Błąd kanału wniosków.', ephemeral: true });
 
         const embed = new EmbedBuilder()
             .setTitle('Nowy wniosek o dowód osobisty')
-            .setDescription(`**Właściciel:** <@${userId}>\n\n**Imię i Nazwisko:** ${imie}\n**Data ur:** ${data_ur}\n**Miejsce ur:** ${miejsce_ur}\n**Płeć:** ${plec}\n**Praca:** ${praca}`);
+            .setDescription(`**Właściciel:** <@${userId}>\n\n**Imię i Nazwisko:** ${imie}\n**Data urodzenia:** ${data_ur}\n**Miejsce urodzenia:** ${miejsce_ur}\n**Płeć:** ${plec}\n**Nick Roblox:** ${roblox}\n**Nick Discord:** ${userTag}\n**Aktualna praca:** Brak`);
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`dowod_akceptuj_stworz_${userId}`).setLabel('Akceptuj').setStyle(ButtonStyle.Success),
@@ -638,7 +639,7 @@ client.on('interactionCreate', async interaction => {
         );
 
         const msg = await channel.send({ embeds: [embed], components: [row] });
-        dowodModule.wnioskiDB.set(msg.id, { type: 'stworz', userId, dane: { imie, data_ur, miejsce_ur, plec, praca } });
+        dowodModule.wnioskiDB.set(msg.id, { type: 'stworz', userId, dane: { imie, data_ur, miejsce_ur, plec, roblox, discord: userTag, praca: 'Brak' } });
 
         return interaction.reply({ content: 'Wniosek o dowód został wysłany do administracji!', ephemeral: true });
     }
@@ -648,14 +649,14 @@ client.on('interactionCreate', async interaction => {
         const data_ur = interaction.fields.getTextInputValue('data_ur');
         const miejsce_ur = interaction.fields.getTextInputValue('miejsce_ur');
         const plec = interaction.fields.getTextInputValue('plec');
-        const praca = interaction.fields.getTextInputValue('praca');
+        const roblox = interaction.fields.getTextInputValue('roblox');
 
         const channel = await interaction.guild.channels.fetch(dowodModule.KANAL_WNIOSKOW).catch(() => null);
         if (!channel) return interaction.reply({ content: 'Błąd kanału wniosków.', ephemeral: true });
 
         const embed = new EmbedBuilder()
             .setTitle('Wniosek o edycję dowodu osobistego')
-            .setDescription(`**Właściciel:** <@${userId}>\n\n**Nowe Imię i Nazwisko:** ${imie}\n**Nowa data ur:** ${data_ur}\n**Nowe miejsce ur:** ${miejsce_ur}\n**Nowa płeć:** ${plec}\n**Nowa praca:** ${praca}`);
+            .setDescription(`**Właściciel:** <@${userId}>\n\n**Nowe Imię i Nazwisko:** ${imie}\n**Nowa data urodzenia:** ${data_ur}\n**Nowe miejsce urodzenia:** ${miejsce_ur}\n**Nowa płeć:** ${plec}\n**Nowy Nick Roblox:** ${roblox}\n**Nowy Nick Discord:** ${userTag}\n**Nowa praca:** Brak`);
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder().setCustomId(`dowod_akceptuj_edytuj_${userId}`).setLabel('Akceptuj').setStyle(ButtonStyle.Success),
@@ -663,7 +664,7 @@ client.on('interactionCreate', async interaction => {
         );
 
         const msg = await channel.send({ embeds: [embed], components: [row] });
-        dowodModule.wnioskiDB.set(msg.id, { type: 'edytuj', userId, dane: { imie, data_ur, miejsce_ur, plec, praca } });
+        dowodModule.wnioskiDB.set(msg.id, { type: 'edytuj', userId, dane: { imie, data_ur, miejsce_ur, plec, roblox, discord: userTag, praca: 'Brak' } });
 
         return interaction.reply({ content: 'Wniosek o edycję dowodu został wysłany do administracji!', ephemeral: true });
     }
@@ -714,8 +715,8 @@ client.on('interactionCreate', async interaction => {
             `Data urodzenia: ${dane.data_ur}\n` +
             `Miejsce urodzenia: ${dane.miejsce_ur}\n` +
             `Płeć: (M/K) ${dane.plec}\n` +
-            `Nick Roblox: <@${targetUserId}>\n` +
-            `Nick Discord: <@${targetUserId}>\n` +
+            `Nick Roblox: ${dane.roblox}\n` +
+            `Nick Discord: ${dane.discord}\n` +
             `Aktualna praca: ${dane.praca}`;
 
         const wyslanaWiadomosc = await kanałDowodow.send(tekstDowodu);
@@ -745,8 +746,8 @@ client.on('interactionCreate', async interaction => {
             `Data urodzenia: ${dane.data_ur}\n` +
             `Miejsce urodzenia: ${dane.miejsce_ur}\n` +
             `Płeć: (M/K) ${dane.plec}\n` +
-            `Nick Roblox: <@${targetUserId}>\n` +
-            `Nick Discord: <@${targetUserId}>\n` +
+            `Nick Roblox: ${dane.roblox}\n` +
+            `Nick Discord: ${dane.discord}\n` +
             `Aktualna praca: ${dane.praca}`;
 
         if (staryWpis) {
