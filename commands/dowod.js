@@ -1,8 +1,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 
-// Prosta baza w pamięci (dla trwałości zalecamy bazę danych jak SQLite/MongoDB)
-const dowodyDB = new Map(); // klucz: userId -> dane dowodu
-const wnioskiDB = new Map(); // klucz: messageId -> dane wniosku
+const dowodyDB = new Map();
+const wnioskiDB = new Map();
 
 const KANAL_WNIOSKOW = '1549106534561218722';
 const KANAL_DOWODOW = '1548821312166699028';
@@ -38,9 +37,10 @@ module.exports = {
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('data_ur').setLabel('Data urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('miejsce_ur').setLabel('Miejsce urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('plec').setLabel('Płeć (M/K)').setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('praca').setLabel('Aktualna praca').setStyle(TextInputStyle.Short).setRequired(true))
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('roblox').setLabel('Nick Roblox').setStyle(TextInputStyle.Short).setRequired(true))
             );
 
+            // Discord pozwala na maksymalnie 5 pól w modalu, więc Nick Discord możemy pobrać automatycznie z interakcji!
             return await interaction.showModal(modal);
         }
 
@@ -67,7 +67,7 @@ module.exports = {
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('data_ur').setLabel('Nowa data urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('miejsce_ur').setLabel('Nowe miejsce urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('plec').setLabel('Nowa płeć (M/K)').setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('praca').setLabel('Nowa praca').setStyle(TextInputStyle.Short).setRequired(true))
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('roblox').setLabel('Nowy Nick Roblox').setStyle(TextInputStyle.Short).setRequired(true))
             );
 
             return await interaction.showModal(modal);
@@ -97,7 +97,6 @@ module.exports = {
         }
     },
 
-    // Eksportujemy bazy oraz kanały do obsługi w index.js
     dowodyDB,
     wnioskiDB,
     KANAL_WNIOSKOW,
