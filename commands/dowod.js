@@ -2,6 +2,7 @@ const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder
 
 const dowodyDB = new Map();
 const wnioskiDB = new Map();
+const tymczasoweDane = new Map(); // Przechowuje dane z 1. kroku przed wysłaniem 2. modalu
 
 const KANAL_WNIOSKOW = '1549106534561218722';
 const KANAL_DOWODOW = '1548821312166699028';
@@ -28,17 +29,17 @@ module.exports = {
                 return interaction.reply({ content: '❌ Masz już aktywny dowód osobisty!', ephemeral: true });
             }
 
+            // Krok 1: Pierwszy modal (5 pól)
             const modal = new ModalBuilder()
-                .setCustomId('modal_dowod_stworz')
-                .setTitle('Tworzenie Dowodu Osobistego');
+                .setCustomId('modal_dowod_krok1')
+                .setTitle('Dowód: Dane Osobowe (1/2)');
 
-            // Discord pozwala na max 5 pól w modalu. Nick Discord jest pobierany automatycznie z Twojego konta.
             modal.addComponents(
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('imie').setLabel('Imię i Nazwisko').setStyle(TextInputStyle.Short).setRequired(true)),
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('data_ur').setLabel('Data urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('miejsce_ur').setLabel('Miejsce urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('plec').setLabel('Płeć (M/K)').setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('roblox').setLabel('Nick Roblox').setStyle(TextInputStyle.Short).setRequired(true))
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('praca').setLabel('Aktualna praca').setStyle(TextInputStyle.Short).setRequired(true))
             );
 
             return await interaction.showModal(modal);
@@ -59,15 +60,15 @@ module.exports = {
             }
 
             const modal = new ModalBuilder()
-                .setCustomId('modal_dowod_edytuj')
-                .setTitle('Edycja Dowodu Osobistego');
+                .setCustomId('modal_dowod_edytuj_krok1')
+                .setTitle('Edycja: Dane Osobowe (1/2)');
 
             modal.addComponents(
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('imie').setLabel('Nowe Imię i Nazwisko').setStyle(TextInputStyle.Short).setRequired(true)),
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('data_ur').setLabel('Nowa data urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('miejsce_ur').setLabel('Nowe miejsce urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('plec').setLabel('Nowa płeć (M/K)').setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('roblox').setLabel('Nowy Nick Roblox').setStyle(TextInputStyle.Short).setRequired(true))
+                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('praca').setLabel('Nowa praca').setStyle(TextInputStyle.Short).setRequired(true))
             );
 
             return await interaction.showModal(modal);
@@ -99,6 +100,7 @@ module.exports = {
 
     dowodyDB,
     wnioskiDB,
+    tymczasoweDane,
     KANAL_WNIOSKOW,
     KANAL_DOWODOW
 };
