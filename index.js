@@ -618,8 +618,6 @@ client.on('interactionCreate', async interaction => {
 
     const userId = interaction.user.id;
 
-    // Krok 1 (Tworzenie) -> Zapisujemy dane i pytamy o krok 2 przez kolejny modal lub przycisk
-    // Ponieważ Discord nie pozwala otworzyć modala z poziomu innego modala, używamy wiadomości z przyciskiem do 2. kroku!
     if (interaction.customId === 'modal_dowod_krok1' || interaction.customId === 'modal_dowod_edytuj_krok1') {
         const isEdit = interaction.customId.includes('edytuj');
 
@@ -629,7 +627,6 @@ client.on('interactionCreate', async interaction => {
         const plec = interaction.fields.getTextInputValue('plec');
         const praca = interaction.fields.getTextInputValue('praca');
 
-        // Zapisujemy tymczasowo dane 1. kroku
         dowodModule.tymczasoweDane.set(userId, { imie, data_ur, miejsce_ur, plec, praca, isEdit });
 
         const row = new ActionRowBuilder().addComponents(
@@ -639,7 +636,6 @@ client.on('interactionCreate', async interaction => {
         return interaction.reply({ content: '✅ Zapisano pierwszy krok! Kliknij poniższy przycisk, aby uzupełnić drugą część formularza.', components: [row], ephemeral: true });
     }
 
-    // Krok 2 (Finał po drugim modalu)
     if (interaction.customId === 'modal_dowod_krok2' || interaction.customId === 'modal_dowod_edytuj_krok2') {
         const isEdit = interaction.customId.includes('edytuj');
         const dane1 = dowodModule.tymczasoweDane.get(userId);
@@ -682,9 +678,14 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// Obsługa przycisku otwierającego 2. modal oraz przycisków administracyjnych
+// =========================================================
+// OBSŁUGA PRZYCISKÓW DOWODÓW (KONTINUACJA I ADMIN)
+// =========================================================
+
 client.on('interactionCreate', async interaction => {
     if (!interaction.isButton()) return;
+    if (!interaction.customId.startsWith('dowod_')) return;
+
     const dowodModule = client.commands.get('dowod');
     if (!dowodModule) return;
 
@@ -710,117 +711,10 @@ client.on('interactionCreate', async interaction => {
         return await interaction.showModal(modal);
     }
 
-    // Obsługa przycisków administracyjnych (Akceptuj / Odrzuć)
-    if (!interaction.customId.startsWith('dowod_')) return;
-
+    // Obsługa przycisków administracyjnych (Akceptuj / Odrzuć / Usuń)
     if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
         return interaction.reply({ content: '❌ Nie masz uprawnień administratora do obsługi tego wniosku.', ephemeral: true });
     }
-
-    const parts = interaction.customId.split('_');
-    const akcja = parts[1]; // akceptuj, odrzuc, usun
-    const typ = parts[2];   // stworz, edytuj, tak, nie
-    const targetUserId = parts[3];
-
-    const wniosek = dowodModule.wnioskiDB.get(interaction.message.id);
-
-    if (akcja === 'odrzuc' || (akcja === 'usun' && typ === 'nie')) {
-        dowodModule.wnioskiDB.delete(interaction.message.id);
-        await interaction.message.delete().catch(() => {});
-
-        try {
-            const user = await client.users.fetch(targetUserId);
-            await user.send('Twoja prośba dotycząca dowodu osobistego została odrzucona przez administrację.');
-        } catch (e) {}
-
-        return interaction.reply({ content: 'Odrzucono wniosek.', ephemeral: true });
-    }
-
-    if (akcja === 'akceptuj' && typ === 'stworz') {
-        const kanałDowodow = await interaction.guild.channels.fetch(dowodModule.KANAL_DOWODOW).catch(() => null);
-        if (!kanałDowodow) return interaction.reply({ content: 'Nie znaleziono kanału docelowego dowodów.', ephemeral: true });
-
-        const dane = wniosek.dane;
-        const tekstDowodu = `🪪 DOWÓD OSOBISTY (<@${targetUserId}>) | OBYWATEL POLSKICH DRÓG \n\n` +
-            `**Dane Osobowe**\n` +
-            `Imię i Nazwisko: ${dane.imie}\n` +
-            `Data urodzenia: ${dane.data_ur}\n` +
-            `Miejsce urodzenia: ${dane.miejsce_ur}\n` +
-            `Płeć: (M/K) ${dane.plec}\n` +
-            `Nick Roblox: ${dane.roblox}\n` +
-            `Nick Discord: ${dane.discord}\n` +
-            `Aktualna praca: ${dane.praca}`;
-
-        const wyslanaWiadomosc = await kanałDowodow.send(tekstDowodu);
-
-        dowodModule.dowodyDB.set(targetUserId, {
-            wiadomoscId: wyslanaWiadomosc.id,
-            linkWiadomosci: wyslanaWiadomosc.url,
-            dane
-        });
-
-        dowodModule.wnioskiDB.delete(interaction.message.id);
-        await interaction.message.delete().catch(() => {});
-        return interaction.reply({ content: 'Zaakceptowano wniosek i utworzono dowód.', ephemeral: true });
-    }
-
-    if (akcja === 'akceptuj' && typ === 'edytuj') {
-        const istniejacyDowod = dowodModule.dowodyDB.get(targetUserId);
-        if (!istniejacyDowod) return interaction.reply({ content: 'Użytkownik nie ma aktywnego dowodu.', ephemeral: true });
-
-        const kanałDowodow = await interaction.guild.channels.fetch(dowodModule.KANAL_DOWODOW).catch(() => null);
-        const staryWpis = await kanałDowodow.messages.fetch(istniejacyDowod.wiadomoscId).catch(() => null);
-
-        const dane = wniosek.dane;
-        const nowyTekst = `🪪 DOWÓD OSOBISTY (<@${targetUserId}>) | OBYWATEL POLSKICH DRÓG \n\n` +
-            `**Dane Osobowe**\n` +
-            `Imię i Nazwisko: ${dane.imie}\n` +
-            `Data urodzenia: ${dane.data_ur}\n` +
-            `Miejsce urodzenia: ${dane.miejsce_ur}\n` +
-            `Płeć: (M/K) ${dane.plec}\n` +
-            `Nick Roblox: ${dane.roblox}\n` +
-            `Nick Discord: ${dane.discord}\n` +
-            `Aktualna praca: ${dane.praca}`;
-
-        if (staryWpis) {
-            await staryWpis.edit(nowyTekst);
-        }
-
-        istniejacyDowod.dane = dane;
-        dowodModule.wnioskiDB.delete(interaction.message.id);
-        await interaction.message.delete().catch(() => {});
-        return interaction.reply({ content: 'Zaktualizowano dowód użytkownika.', ephemeral: true });
-    }
-
-    if (akcja === 'usun' && typ === 'tak') {
-        const istniejacyDowod = dowodModule.dowodyDB.get(targetUserId);
-        if (istniejacyDowod) {
-            const kanałDowodow = await interaction.guild.channels.fetch(dowodModule.KANAL_DOWODOW).catch(() => null);
-            const staryWpis = await kanałDowodow.messages.fetch(istniejacyDowod.wiadomoscId).catch(() => null);
-            if (staryWpis) await staryWpis.delete().catch(() => {});
-            dowodModule.dowodyDB.delete(targetUserId);
-        }
-
-        dowodModule.wnioskiDB.delete(interaction.message.id);
-        await interaction.message.delete().catch(() => {});
-        return interaction.reply({ content: 'Usunięto dowód użytkownika.', ephemeral: true });
-    }
-});
-
-// =========================================================
-// OBSŁUGA PRZYCISKÓW DOWODÓW
-// =========================================================
-
-client.on('interactionCreate', async interaction => {
-    if (!interaction.isButton()) return;
-    if (!interaction.customId.startsWith('dowod_')) return;
-
-    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: '❌ Nie masz uprawnień administratora do obsługi tego wniosku.', ephemeral: true });
-    }
-
-    const dowodModule = client.commands.get('dowod');
-    if (!dowodModule) return;
 
     const parts = interaction.customId.split('_');
     const akcja = parts[1]; // akceptuj, odrzuc, usun
