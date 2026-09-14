@@ -55,42 +55,53 @@ const client = new Client({
 });
 
 // =========================================================
-// BAZA DANYCH DOWODÓW (PLIK JSON)
+// BAZA DOWODÓW (PAMIĘĆ + SYNC Z KANAŁEM)
 // =========================================================
-
-const dowodyFilePath = path.join(__dirname, 'dowody.json');
-
-function loadDowodyDB() {
-    if (fs.existsSync(dowodyFilePath)) {
-        try {
-            const data = fs.readFileSync(dowodyFilePath, 'utf8');
-            const parsed = JSON.parse(data);
-            return new Map(Object.entries(parsed));
-        } catch (e) {
-            console.error('Błąd podczas wczytywania pliku dowody.json:', e);
-            return new Map();
-        }
-    }
-    return new Map();
-}
-
-function saveDowodyDB(dbMap) {
-    try {
-        const obj = Object.fromEntries(dbMap);
-        fs.writeFileSync(dowodyFilePath, JSON.stringify(obj, null, 2), 'utf8');
-    } catch (e) {
-        console.error('Błąd podczas zapisywania pliku dowody.json:', e);
-    }
-}
 
 const dowodModule = {
     name: 'dowod',
     tymczasoweDane: new Map(),
     wnioskiDB: new Map(),
-    dowodyDB: loadDowodyDB(), // Ładowanie trwałe przy starcie
+    dowodyDB: new Map(),
     KANAL_WNIOSKOW: '1549106534561218722',
     KANAL_DOWODOW: '1548821312166699028'
 };
+
+async function pobierzLubOdzyskajDowod(interaction, userId) {
+    if (dowodModule.dowodyDB.has(userId)) {
+        return dowodModule.dowodyDB.get(userId);
+    }
+
+    const kanalDowodow = await interaction.guild.channels.fetch(dowodModule.KANAL_DOWODOW).catch(() => null);
+    if (!kanalDowodow) return null;
+
+    // Pobieramy do 100 ostatnich wiadomości z kanału dowodów
+    const messages = await kanalDowodow.messages.fetch({ limit: 100 }).catch(() => null);
+    if (!messages) return null;
+
+    // Szukamy wiadomości, która zawiera ID użytkownika
+    const msg = messages.find(m => m.content.includes(userId));
+
+    if (msg) {
+        const lines = msg.content.split('\n');
+        
+        const dane = {
+            imie: lines.find(l => l.startsWith('Imię i Nazwisko:'))?.replace('Imię i Nazwisko: ', '').trim() || '',
+            data_ur: lines.find(l => l.startsWith('Data urodzenia:'))?.replace('Data urodzenia: ', '').trim() || '',
+            miejsce_ur: lines.find(l => l.startsWith('Miejsce urodzenia:'))?.replace('Miejsce urodzenia: ', '').trim() || '',
+            plec: lines.find(l => l.startsWith('Płeć:'))?.replace(/Płeć:.*?(M\/K)?/, '').replace('(', '').replace(')', '').trim() || 'M/K',
+            roblox: lines.find(l => l.startsWith('Nick Roblox:'))?.replace('Nick Roblox: ', '').trim() || '',
+            discord: lines.find(l => l.startsWith('Nick Discord:'))?.replace('Nick Discord: ', '').trim() || '',
+            praca: lines.find(l => l.startsWith('Aktualna praca:'))?.replace('Aktualna praca: ', '').trim() || ''
+        };
+
+        const dowodObj = { wiadomoscId: msg.id, linkWiadomosci: msg.url, dane };
+        dowodModule.dowodyDB.set(userId, dowodObj);
+        return dowodObj;
+    }
+
+    return null;
+}
 
 client.commands = new Collection();
 client.commands.set('dowod', dowodModule);
@@ -110,10 +121,7 @@ const LOG_CHANNEL_ID = '1548682257320120380';
 
 async function sendLog(content) {
     try {
-        const channel = await client.channels
-            .fetch(LOG_CHANNEL_ID)
-            .catch(() => null);
-
+        const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
         if (channel) {
             await channel.send({ content });
         }
@@ -258,7 +266,8 @@ client.on('interactionCreate', async interaction => {
         const userId = interaction.user.id;
 
         if (podkomenda === 'stworz') {
-            if (dowodModule.dowodyDB.has(userId)) {
+            const istniejacy = await pobierzLubOdzyskajDowod(interaction, userId);
+            if (istniejacy) {
                 return interaction.reply({ content: '❌ Masz już aktywny dowód osobisty! Użyj opcji edycji lub usuń obecny.', ephemeral: true });
             }
 
@@ -278,11 +287,12 @@ client.on('interactionCreate', async interaction => {
         }
 
         if (podkomenda === 'edytuj') {
-            if (!dowodModule.dowodyDB.has(userId)) {
+            const istniejacyDowod = await pobierzLubOdzyskajDowod(interaction, userId);
+            if (!istniejacyDowod) {
                 return interaction.reply({ content: '❌ Nie masz jeszcze swojego dowodu osobistego, więc nie masz czego edytować.', ephemeral: true });
             }
 
-            const istniejacy = dowodModule.dowodyDB.get(userId).dane;
+            const istniejacy = istniejacyDowod.dane;
 
             const modal = new ModalBuilder()
                 .setCustomId('modal_dowod_edytuj_krok1')
@@ -300,7 +310,7 @@ client.on('interactionCreate', async interaction => {
         }
 
         if (podkomenda === 'usun') {
-            const istniejacyDowod = dowodModule.dowodyDB.get(userId);
+            const istniejacyDowod = await pobierzLubOdzyskajDowod(interaction, userId);
             if (!istniejacyDowod) {
                 return interaction.reply({ content: '❌ Nie posiadasz aktywnego dowodu.', ephemeral: true });
             }
@@ -407,7 +417,7 @@ client.on('interactionCreate', async interaction => {
         const embed = new EmbedBuilder();
 
         if (isEdit) {
-            const istniejacyDowod = dowodModule.dowodyDB.get(userId);
+            const istniejacyDowod = await pobierzLubOdzyskajDowod(interaction, userId);
             const starych = istniejacyDowod ? istniejacyDowod.dane : {};
 
             embed.setTitle('Wniosek o edycję dowodu osobistego')
@@ -513,7 +523,7 @@ client.on('interactionCreate', async interaction => {
             await user.send('Twoja prośba dotycząca dowodu osobistego została odrzucona przez administrację.');
         } catch (e) {}
 
-        embed.setColor(0xe74c3c); // Czerwony
+        embed.setColor(0xe74c3c);
         embed.setDescription(`❌ **Wniosek odrzucony przez <@${interaction.user.id}>**\n\n` + embed.data.description);
 
         await interaction.message.edit({ embeds: [embed], components: [disabledRow] });
@@ -542,11 +552,10 @@ client.on('interactionCreate', async interaction => {
             linkWiadomosci: wyslanaWiadomosc.url,
             dane
         });
-        saveDowodyDB(dowodModule.dowodyDB); // Zapis do pliku JSON
 
         dowodModule.wnioskiDB.delete(interaction.message.id);
         
-        embed.setColor(0x2ecc71); // Zielony
+        embed.setColor(0x2ecc71);
         embed.setDescription(`✅ **Wniosek zaakceptowany przez <@${interaction.user.id}>**\n\n` + embed.data.description);
 
         await interaction.message.edit({ embeds: [embed], components: [disabledRow] });
@@ -554,7 +563,7 @@ client.on('interactionCreate', async interaction => {
     }
 
     if (akcja === 'akceptuj' && typ === 'edytuj') {
-        const istniejacyDowod = dowodModule.dowodyDB.get(targetUserId);
+        const istniejacyDowod = await pobierzLubOdzyskajDowod(interaction, targetUserId);
         if (!istniejacyDowod) return interaction.reply({ content: 'Użytkownik nie ma aktywnego dowodu.', ephemeral: true });
 
         const kanałDowodow = await interaction.guild.channels.fetch(dowodModule.KANAL_DOWODOW).catch(() => null);
@@ -576,11 +585,9 @@ client.on('interactionCreate', async interaction => {
         }
 
         istniejacyDowod.dane = dane;
-        saveDowodyDB(dowodModule.dowodyDB); // Zapis do pliku JSON
-
         dowodModule.wnioskiDB.delete(interaction.message.id);
 
-        embed.setColor(0x2ecc71); // Zielony
+        embed.setColor(0x2ecc71);
         embed.setDescription(`✅ **Edycja zatwierdzona przez <@${interaction.user.id}>**\n\n` + embed.data.description);
 
         await interaction.message.edit({ embeds: [embed], components: [disabledRow] });
@@ -588,18 +595,17 @@ client.on('interactionCreate', async interaction => {
     }
 
     if (akcja === 'akceptuj' && typ === 'usun') {
-        const istniejacyDowod = dowodModule.dowodyDB.get(targetUserId);
+        const istniejacyDowod = await pobierzLubOdzyskajDowod(interaction, targetUserId);
         if (istniejacyDowod) {
             const kanałDowodow = await interaction.guild.channels.fetch(dowodModule.KANAL_DOWODOW).catch(() => null);
             const staryWpis = kanałDowodow ? await kanałDowodow.messages.fetch(istniejacyDowod.wiadomoscId).catch(() => null) : null;
             if (staryWpis) await staryWpis.delete().catch(() => {});
             dowodModule.dowodyDB.delete(targetUserId);
-            saveDowodyDB(dowodModule.dowodyDB); // Zapis do pliku JSON
         }
 
         dowodModule.wnioskiDB.delete(interaction.message.id);
 
-        embed.setColor(0xf1c40f); // Żółty / Bursztynowy
+        embed.setColor(0xf1c40f);
         embed.setDescription(`⚠️ **Usunięcie dowodu zatwierdzone przez <@${interaction.user.id}>**\n\n` + embed.data.description);
 
         await interaction.message.edit({ embeds: [embed], components: [disabledRow] });
