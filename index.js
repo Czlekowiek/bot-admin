@@ -11,7 +11,10 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    PermissionFlagsBits
+    PermissionFlagsBits,
+    ModalBuilder,     // <--- DODAJ TĘ LINIJKĘ
+    TextInputBuilder,
+    TextInputStyle
 } = require('discord.js');
 
 const http = require('http');
