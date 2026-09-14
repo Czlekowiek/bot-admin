@@ -32,6 +32,7 @@ module.exports = {
                 .setCustomId('modal_dowod_stworz')
                 .setTitle('Tworzenie Dowodu Osobistego');
 
+            // Discord pozwala na max 5 pól w modalu. Nick Discord jest pobierany automatycznie z Twojego konta.
             modal.addComponents(
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('imie').setLabel('Imię i Nazwisko').setStyle(TextInputStyle.Short).setRequired(true)),
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('data_ur').setLabel('Data urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
@@ -40,7 +41,6 @@ module.exports = {
                 new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('roblox').setLabel('Nick Roblox').setStyle(TextInputStyle.Short).setRequired(true))
             );
 
-            // Discord pozwala na maksymalnie 5 pól w modalu, więc Nick Discord możemy pobrać automatycznie z interakcji!
             return await interaction.showModal(modal);
         }
 
