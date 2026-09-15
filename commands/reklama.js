@@ -18,7 +18,7 @@ module.exports = {
                 .setRequired(true))
         .addStringOption(option =>
             option.setName('logo')
-                .setDescription('Link do loga serwera (opcjonalnie)')
+                .setDescription('Link do loga serwera - miniatura (opcjonalnie)')
                 .setRequired(false)),
 
     async execute(interaction) {
@@ -53,9 +53,9 @@ module.exports = {
             })
             .setTimestamp();
 
-        // Jeśli podano opcjonalne logo, ustawiamy je jako ikonę autora
+        // Jeśli podano opcjonalne logo, ustawiamy je jako miniaturę (thumbnail)
         if (logo) {
-            reklamaEmbed.setAuthor({ name: nazwa, iconURL: logo });
+            reklamaEmbed.setThumbnail(logo);
         }
 
         return interaction.reply({ embeds: [reklamaEmbed] });
