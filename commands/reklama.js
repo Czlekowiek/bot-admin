@@ -44,19 +44,13 @@ module.exports = {
             }
         }
 
-        // Łączenie nazwy jako nagłówka i treści reklamy w description
-        const finalDescription = `# ${nazwa}\n\n${tresc}`;
-
-        // Przygotowanie wartości pola z linkiem i ukrytym przedstawicielem
-        const linkFieldValue = `## ⛓️ Link do serwera\n# [Kliknij, aby dołączyć!](${link})\n||${przedstawiciel}||`;
+        // Składanie całego opisu: Nazwa -> Treść -> Odstęp -> Link w opisie ze spoilerem przedstawiciela
+        const finalDescription = `# ${nazwa}\n\n${tresc}\n\n## ⛓️ Link do serwera\n## [Kliknij, aby dołączyć!](${link})\n||${przedstawiciel}||`;
 
         // Budowanie embeda w kolorze #FFCE00
         const reklamaEmbed = new EmbedBuilder()
             .setDescription(finalDescription)
             .setColor(0xFFCE00)
-            .addFields(
-                { name: '\u200b', value: linkFieldValue, inline: false }
-            )
             .setFooter({ 
                 text: `Reklama wysłana przez ${interaction.user.tag}`, 
                 iconURL: interaction.user.displayAvatarURL() 
