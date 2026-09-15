@@ -8,6 +8,7 @@ const ROLES_TO_TRACK = [
     { id: '1542991925521420330', name: '<:admin_orange:1548649349834080327> Junior Admin' },
     { id: '1548662787071279145', name: '<:admin_green:1548649490964025446> Moderator' },
     { id: '1548662868960870502', name: '<:admin_lightgreen:1548663391491592295> Junior Moderator' },
+    { id: '1549147393411387392', name: '<:admin_pink:1548649643502473256> Zarząd Developerów' },
     { id: '1542127336193785886', name: '<:admin_blue:1548649538389024768> Developer' },
     { id: '1543996411350098010', name: '<:admin_turquoise:1548650090703491153> Zarząd Frakcji' }
 ];
