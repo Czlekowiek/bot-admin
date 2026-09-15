@@ -39,10 +39,12 @@ module.exports = {
             }
         }
 
+        // Łączenie nazwy jako nagłówka i treści reklamy w description
+        const finalDescription = `# ${nazwa}\n\n${tresc}`;
+
         // Budowanie embeda w kolorze #FFCE00
         const reklamaEmbed = new EmbedBuilder()
-            .setTitle(nazwa)
-            .setDescription(tresc)
+            .setDescription(finalDescription)
             .setColor(0xFFCE00)
             .addFields(
                 { name: '🔗 Link do serwera', value: `[Kliknij, aby dołączyć!](${link})`, inline: false }
