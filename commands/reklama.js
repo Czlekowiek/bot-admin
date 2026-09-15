@@ -44,8 +44,8 @@ module.exports = {
             }
         }
 
-        // Składanie całego opisu: Nazwa -> Treść -> Odstęp -> Link w opisie ze spoilerem przedstawiciela
-        const finalDescription = `# ${nazwa}\n\n${tresc}\n\n## ⛓️ Link do serwera\n## [Kliknij, aby dołączyć!](${link})\n||${przedstawiciel}||`;
+        // Składanie całego opisu zgodnie z nowym formatem
+        const finalDescription = `# ${nazwa}\n\n${tresc}\n\n## ⛓️ Link do serwera: [Kliknij, aby dołączyć!](${link})\n||${przedstawiciel}||`;
 
         // Budowanie embeda w kolorze #FFCE00
         const reklamaEmbed = new EmbedBuilder()
