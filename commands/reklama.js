@@ -16,6 +16,10 @@ module.exports = {
             option.setName('link')
                 .setDescription('Link zaproszenia do serwera')
                 .setRequired(true))
+        .addUserOption(option =>
+            option.setName('przedstawiciel')
+                .setDescription('Osoba reprezentująca ten serwer (współpraca)')
+                .setRequired(true))
         .addStringOption(option =>
             option.setName('logo')
                 .setDescription('Link do loga serwera - miniatura (opcjonalnie)')
@@ -25,6 +29,7 @@ module.exports = {
         const nazwa = interaction.options.getString('nazwa');
         let tresc = interaction.options.getString('reklama');
         let link = interaction.options.getString('link').trim();
+        const przedstawiciel = interaction.options.getUser('przedstawiciel');
         let logo = interaction.options.getString('logo');
 
         // Czyszczenie linku z ewentualnych nawiasów ostrokątnych (<...>)
@@ -42,12 +47,15 @@ module.exports = {
         // Łączenie nazwy jako nagłówka i treści reklamy w description
         const finalDescription = `# ${nazwa}\n\n${tresc}`;
 
+        // Przygotowanie wartości pola z linkiem i ukrytym przedstawicielem
+        const linkFieldValue = `## ⛓️ Link do serwera\n# [Kliknij, aby dołączyć!](${link})\n||${przedstawiciel}||`;
+
         // Budowanie embeda w kolorze #FFCE00
         const reklamaEmbed = new EmbedBuilder()
             .setDescription(finalDescription)
             .setColor(0xFFCE00)
             .addFields(
-                { name: '🔗 Link do serwera', value: `[Kliknij, aby dołączyć!](${link})`, inline: false }
+                { name: '\u200b', value: linkFieldValue, inline: false }
             )
             .setFooter({ 
                 text: `Reklama wysłana przez ${interaction.user.tag}`, 
