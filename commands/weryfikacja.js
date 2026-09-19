@@ -70,8 +70,8 @@ module.exports = {
         });
 
         client.on('channelCreate', async channel => {
-            if (!channel.guild || channel.id === KANAL_WERYFIKACJI) continue;
-            if (channel.isThread && channel.isThread()) continue;
+            if (!channel.guild || channel.id === KANAL_WERYFIKACJI) return;
+            if (channel.isThread && channel.isThread()) return;
 
             try {
                 await channel.permissionOverwrites.edit(ROLA_NIEZWERYFIKOWANY, { ViewChannel: false });
