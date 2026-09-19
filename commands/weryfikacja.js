@@ -115,7 +115,7 @@ module.exports = {
                 const expectedCode = captchaStorage.get(interaction.user.id);
 
                 if (!expectedCode || userInput !== expectedCode) {
-                    return interaction.editReply({ content: '❌ Błędny kod! Kliknij przycisk "Zweryfikuj" ponownie.' });
+                    return interaction.editReply({ content: '<a:redtick:1543991522192527450> Błędny kod! Kliknij przycisk "Zweryfikuj" ponownie.' });
                 }
 
                 captchaStorage.delete(interaction.user.id);
@@ -127,10 +127,10 @@ module.exports = {
                     }
                     await member.roles.add(ROLA_ZWERYFIKOWANY);
 
-                    return interaction.editReply({ content: '✅ Pomyślnie przeszperano weryfikację! Witaj na serwerze.' });
+                    return interaction.editReply({ content: '<a:greentick:1543991524738465853> Pomyślnie przeszperano weryfikację! Witaj na serwerze.' });
                 } catch (error) {
                     console.error('Błąd podczas zmiany ról weryfikacji:', error);
-                    return interaction.editReply({ content: '❌ Wystąpił błąd podczas nadawania ról. Powiadom administrację.' });
+                    return interaction.editReply({ content: '<a:redtick:1543991522192527450> Wystąpił błąd podczas nadawania ról. Powiadom administrację.' });
                 }
             }
         });
