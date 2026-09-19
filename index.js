@@ -55,8 +55,17 @@ const client = new Client({
 });
 
 // =========================================================
-// BAZA DOWODÓW (PAMIĘĆ + SYNC Z KANAŁEM)
+// BAZY DANYCH / PAMIĘĆ (DOWODY I WERYFIKACJA)
 // =========================================================
+
+const captchaStorage = new Map();
+const ROLA_NIEZWERYFIKOWANY = '1550876638013685901';
+const ROLA_ZWERYFIKOWANY = '1542126972669403178';
+const KANAL_WERYFIKACJI = '1544013529353294004';
+
+function generateRandomDigits() {
+    return Math.floor(10000 + Math.random() * 90000).toString();
+}
 
 const dowodModule = {
     name: 'dowod',
@@ -233,14 +242,15 @@ client.once('ready', async () => {
 });
 
 // =========================================================
-// POWITANIA / POŻEGNANIA
+// POWITANIA / POŻEGNANIA / WERYFIKACJA AUTOMATYCZNA
 // =========================================================
 
 client.on('guildMemberAdd', async member => {
     try {
+        await member.roles.add(ROLA_NIEZWERYFIKOWANY).catch(() => {});
         await sendWelcomeMessage(member);
     } catch (error) {
-        console.error('❌ Błąd podczas wysyłania powitania:', error);
+        console.error('❌ Błąd podczas powitania / nadawania roli:', error);
     }
 });
 
@@ -250,6 +260,18 @@ client.on('guildMemberRemove', async member => {
     } catch (error) {
         console.error('❌ Błąd podczas wysyłania pożegnania:', error);
     }
+});
+
+client.on('channelCreate', async channel => {
+    if (!channel.guild) return;
+    if (channel.id === KANAL_WERYFIKACJI) return;
+    if (channel.isThread && channel.isThread()) return;
+
+    try {
+        await channel.permissionOverwrites.edit(ROLA_NIEZWERYFIKOWANY, {
+            ViewChannel: false
+        });
+    } catch (error) {}
 });
 
 // =========================================================
@@ -377,104 +399,153 @@ client.on('interactionCreate', async interaction => {
 });
 
 // =========================================================
-// OBSŁUGA MODALI DOWODÓW
+// OBSŁUGA INTERAKCJI (WERYFIKACJA + MODALE DOWODÓW)
 // =========================================================
 
 client.on('interactionCreate', async interaction => {
-    if (!interaction.isModalSubmit()) return;
+    // 1. Obsługa przycisku Weryfikacji
+    if (interaction.isButton() && interaction.customId === 'start_verification_modal') {
+        const code = generateRandomDigits();
+        captchaStorage.set(interaction.user.id, code);
 
-    const dowodModule = client.commands.get('dowod');
-    if (!dowodModule) return;
+        const modal = new ModalBuilder()
+            .setCustomId('verification_modal_submit')
+            .setTitle('Weryfikacja Captcha');
 
-    const userId = interaction.user.id;
+        const input = new TextInputBuilder()
+            .setCustomId('verification_code_input')
+            .setLabel(`Przepisz te cyfry: [ ${code} ]`)
+            .setStyle(TextInputStyle.Short)
+            .setMinLength(5)
+            .setMaxLength(5)
+            .setRequired(true);
 
-    if (interaction.customId === 'modal_dowod_krok1' || interaction.customId === 'modal_dowod_edytuj_krok1') {
-        const isEdit = interaction.customId.includes('edytuj');
-
-        const imie = interaction.fields.getTextInputValue('imie');
-        const data_ur = interaction.fields.getTextInputValue('data_ur');
-        const miejsce_ur = interaction.fields.getTextInputValue('miejsce_ur');
-        const plec = interaction.fields.getTextInputValue('plec');
-        const praca = interaction.fields.getTextInputValue('praca');
-
-        dowodModule.tymczasoweDane.set(userId, { imie, data_ur, miejsce_ur, plec, praca, isEdit });
-
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`dowod_kontynuuj_${userId}`).setLabel('Przejdź do kroku 2 (Roblox/Discord)').setStyle(ButtonStyle.Primary)
-        );
-
-        return interaction.reply({ content: '✅ Zapisano pierwszy krok! Kliknij poniższy przycisk, aby uzupełnić drugą część formularza.', components: [row], ephemeral: true });
+        modal.addComponents(new ActionRowBuilder().addComponents(input));
+        return await interaction.showModal(modal);
     }
 
-    if (interaction.customId === 'modal_dowod_krok2' || interaction.customId === 'modal_dowod_edytuj_krok2') {
-        const isEdit = interaction.customId.includes('edytuj');
-        const dane1 = dowodModule.tymczasoweDane.get(userId);
+    // 2. Obsługa przesłania modala Weryfikacji
+    if (interaction.isModalSubmit() && interaction.customId === 'verification_modal_submit') {
+        await interaction.deferReply({ ephemeral: true });
+        
+        const userInput = interaction.fields.getTextInputValue('verification_code_input').trim();
+        const expectedCode = captchaStorage.get(interaction.user.id);
 
-        if (!dane1) {
-            return interaction.reply({ content: '❌ Wygasły dane z pierwszego kroku. Zacznij od nowa.', ephemeral: true });
+        if (!expectedCode || userInput !== expectedCode) {
+            return interaction.editReply({ content: '❌ Błędny kod! Kliknij przycisk "Zweryfikuj" ponownie.' });
         }
 
-        const roblox = interaction.fields.getTextInputValue('roblox');
-        const discordNick = interaction.fields.getTextInputValue('discord');
+        captchaStorage.delete(interaction.user.id);
 
-        const channel = await interaction.guild.channels.fetch(dowodModule.KANAL_WNIOSKOW).catch(() => null);
-        if (!channel) return interaction.reply({ content: 'Błąd kanału wniosków.', ephemeral: true });
+        const member = interaction.member;
+        try {
+            if (member.roles.cache.has(ROLA_NIEZWERYFIKOWANY)) {
+                await member.roles.remove(ROLA_NIEZWERYFIKOWANY);
+            }
+            await member.roles.add(ROLA_ZWERYFIKOWANY);
 
-        const pelneDane = { ...dane1, roblox, discord: discordNick };
-        const akcjaTyp = isEdit ? 'edytuj' : 'stworz';
-        const embed = new EmbedBuilder();
+            return interaction.editReply({ content: '✅ Pomyślnie zweryfikowano! Witaj na serwerze.' });
+        } catch (error) {
+            console.error('Błąd podczas nadawania ról weryfikacji:', error);
+            return interaction.editReply({ content: '❌ Wystąpił błąd podczas nadawania ról. Powiadom administrację.' });
+        }
+    }
 
-        if (isEdit) {
-            const istniejacyDowod = await pobierzLubOdzyskajDowod(interaction, userId);
-            const starych = istniejacyDowod ? istniejacyDowod.dane : {};
+    // 3. Obsługa Modali Dowodów
+    if (interaction.isModalSubmit()) {
+        const dowodModule = client.commands.get('dowod');
+        if (!dowodModule) return;
 
-            embed.setTitle('Wniosek o edycję dowodu osobistego')
-                .setColor(0x3498db)
-                .setDescription(`**Właściciel:** <@${userId}>\n\n` +
-                    `### 🔴 Dane przed zmianą:\n` +
-                    `• **Imię i Nazwisko:** ${starych.imie || 'Brak'}\n` +
-                    `• **Data urodzenia:** ${starych.data_ur || 'Brak'}\n` +
-                    `• **Miejsce urodzenia:** ${starych.miejsce_ur || 'Brak'}\n` +
-                    `• **Płeć:** ${starych.plec || 'Brak'}\n` +
-                    `• **Nick Roblox:** ${starych.roblox || 'Brak'}\n` +
-                    `• **Nick Discord:** ${starych.discord || 'Brak'}\n` +
-                    `• **Praca:** ${starych.praca || 'Brak'}\n\n` +
-                    `### 🟢 Dane po zmianie (Nowe):\n` +
-                    `• **Imię i Nazwisko:** ${pelneDane.imie}\n` +
-                    `• **Data urodzenia:** ${pelneDane.data_ur}\n` +
-                    `• **Miejsce urodzenia:** ${pelneDane.miejsce_ur}\n` +
-                    `• **Płeć:** ${pelneDane.plec}\n` +
-                    `• **Nick Roblox:** ${pelneDane.roblox}\n` +
-                    `• **Nick Discord:** ${pelneDane.discord}\n` +
-                    `• **Praca:** ${pelneDane.praca}`);
-        } else {
-            embed.setTitle('Nowy wniosek o dowód osobisty')
-                .setColor(0x3498db)
-                .setDescription(`**Właściciel:** <@${userId}>\n\n` +
-                    `**Imię i Nazwisko:** ${pelneDane.imie}\n` +
-                    `**Data urodzenia:** ${pelneDane.data_ur}\n` +
-                    `**Miejsce urodzenia:** ${pelneDane.miejsce_ur}\n` +
-                    `**Płeć:** ${pelneDane.plec}\n` +
-                    `**Nick Roblox:** ${pelneDane.roblox}\n` +
-                    `**Nick Discord:** ${pelneDane.discord}\n` +
-                    `**Aktualna praca:** ${pelneDane.praca}`);
+        const userId = interaction.user.id;
+
+        if (interaction.customId === 'modal_dowod_krok1' || interaction.customId === 'modal_dowod_edytuj_krok1') {
+            const isEdit = interaction.customId.includes('edytuj');
+
+            const imie = interaction.fields.getTextInputValue('imie');
+            const data_ur = interaction.fields.getTextInputValue('data_ur');
+            const miejsce_ur = interaction.fields.getTextInputValue('miejsce_ur');
+            const plec = interaction.fields.getTextInputValue('plec');
+            const praca = interaction.fields.getTextInputValue('praca');
+
+            dowodModule.tymczasoweDane.set(userId, { imie, data_ur, miejsce_ur, plec, praca, isEdit });
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`dowod_kontynuuj_${userId}`).setLabel('Przejdź do kroku 2 (Roblox/Discord)').setStyle(ButtonStyle.Primary)
+            );
+
+            return interaction.reply({ content: '✅ Zapisano pierwszy krok! Kliknij poniższy przycisk, aby uzupełnić drugą część formularza.', components: [row], ephemeral: true });
         }
 
-        const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setCustomId(`dowod_akceptuj_${akcjaTyp}_${userId}`).setLabel('Akceptuj').setStyle(ButtonStyle.Success),
-            new ButtonBuilder().setCustomId(`dowod_odrzuc_${akcjaTyp}_${userId}`).setLabel('Odrzuć').setStyle(ButtonStyle.Danger)
-        );
+        if (interaction.customId === 'modal_dowod_krok2' || interaction.customId === 'modal_dowod_edytuj_krok2') {
+            const isEdit = interaction.customId.includes('edytuj');
+            const dane1 = dowodModule.tymczasoweDane.get(userId);
 
-        const msg = await channel.send({ embeds: [embed], components: [row] });
-        dowodModule.wnioskiDB.set(msg.id, { type: akcjaTyp, userId, dane: pelneDane });
-        dowodModule.tymczasoweDane.delete(userId);
+            if (!dane1) {
+                return interaction.reply({ content: '❌ Wygasły dane z pierwszego kroku. Zacznij od nowa.', ephemeral: true });
+            }
 
-        return interaction.reply({ content: '🎉 Wniosek został w pełni uzupełniony i wysłany do administracji!', ephemeral: true });
+            const roblox = interaction.fields.getTextInputValue('roblox');
+            const discordNick = interaction.fields.getTextInputValue('discord');
+
+            const channel = await interaction.guild.channels.fetch(dowodModule.KANAL_WNIOSKOW).catch(() => null);
+            if (!channel) return interaction.reply({ content: 'Błąd kanału wniosków.', ephemeral: true });
+
+            const pelneDane = { ...dane1, roblox, discord: discordNick };
+            const akcjaTyp = isEdit ? 'edytuj' : 'stworz';
+            const embed = new EmbedBuilder();
+
+            if (isEdit) {
+                const istniejacyDowod = await pobierzLubOdzyskajDowod(interaction, userId);
+                const starych = istniejacyDowod ? istniejacyDowod.dane : {};
+
+                embed.setTitle('Wniosek o edycję dowodu osobistego')
+                    .setColor(0x3498db)
+                    .setDescription(`**Właściciel:** <@${userId}>\n\n` +
+                        `### 🔴 Dane przed zmianą:\n` +
+                        `• **Imię i Nazwisko:** ${starych.imie || 'Brak'}\n` +
+                        `• **Data urodzenia:** ${starych.data_ur || 'Brak'}\n` +
+                        `• **Miejsce urodzenia:** ${starych.miejsce_ur || 'Brak'}\n` +
+                        `• **Płeć:** ${starych.plec || 'Brak'}\n` +
+                        `• **Nick Roblox:** ${starych.roblox || 'Brak'}\n` +
+                        `• **Nick Discord:** ${starych.discord || 'Brak'}\n` +
+                        `• **Praca:** ${starych.praca || 'Brak'}\n\n` +
+                        `### 🟢 Dane po zmianie (Nowe):\n` +
+                        `• **Imię i Nazwisko:** ${pelneDane.imie}\n` +
+                        `• **Data urodzenia:** ${pelneDane.data_ur}\n` +
+                        `• **Miejsce urodzenia:** ${pelneDane.miejsce_ur}\n` +
+                        `• **Płeć:** ${pelneDane.plec}\n` +
+                        `• **Nick Roblox:** ${pelneDane.roblox}\n` +
+                        `• **Nick Discord:** ${pelneDane.discord}\n` +
+                        `• **Praca:** ${pelneDane.praca}`);
+            } else {
+                embed.setTitle('Nowy wniosek o dowód osobisty')
+                    .setColor(0x3498db)
+                    .setDescription(`**Właściciel:** <@${userId}>\n\n` +
+                        `**Imię i Nazwisko:** ${pelneDane.imie}\n` +
+                        `**Data urodzenia:** ${pelneDane.data_ur}\n` +
+                        `**Miejsce urodzenia:** ${pelneDane.miejsce_ur}\n` +
+                        `**Płeć:** ${pelneDane.plec}\n` +
+                        `**Nick Roblox:** ${pelneDane.roblox}\n` +
+                        `**Nick Discord:** ${pelneDane.discord}\n` +
+                        `**Aktualna praca:** ${pelneDane.praca}`);
+            }
+
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`dowod_akceptuj_${akcjaTyp}_${userId}`).setLabel('Akceptuj').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId(`dowod_odrzuc_${akcjaTyp}_${userId}`).setLabel('Odrzuć').setStyle(ButtonStyle.Danger)
+            );
+
+            const msg = await channel.send({ embeds: [embed], components: [row] });
+            dowodModule.wnioskiDB.set(msg.id, { type: akcjaTyp, userId, dane: pelneDane });
+            dowodModule.tymczasoweDane.delete(userId);
+
+            return interaction.reply({ content: '🎉 Wniosek został w pełni uzupełniony i wysłany do administracji!', ephemeral: true });
+        }
     }
 });
 
 // =========================================================
-// OBSŁUGA PRZYCISKÓW DOWODÓW (KONTINUACJA I ADMIN)
+// OBSŁUGA PRZYCISKÓW DOWODÓW
 // =========================================================
 
 client.on('interactionCreate', async interaction => {
@@ -509,9 +580,11 @@ client.on('interactionCreate', async interaction => {
         return interaction.reply({ content: '❌ Nie masz uprawnień administratora do obsługi tego wniosku.', ephemeral: true });
     }
 
+    await interaction.deferUpdate();
+
     const parts = interaction.customId.split('_');
-    const akcja = parts[1]; // akceptuj lub odrzuc
-    const typ = parts[2];   // stworz, edytuj lub usun
+    const akcja = parts[1];
+    const typ = parts[2];
     const targetUserId = parts[3];
 
     const wniosek = dowodModule.wnioskiDB.get(interaction.message.id);
@@ -535,12 +608,12 @@ client.on('interactionCreate', async interaction => {
         embed.setDescription(`❌ **Wniosek odrzucony przez <@${interaction.user.id}>**\n\n` + embed.data.description);
 
         await interaction.message.edit({ embeds: [embed], components: [disabledRow] });
-        return interaction.reply({ content: 'Odrzucono wniosek.', ephemeral: true });
+        return interaction.followUp({ content: 'Odrzucono wniosek.', ephemeral: true });
     }
 
     if (akcja === 'akceptuj' && typ === 'stworz') {
         const kanałDowodow = await interaction.guild.channels.fetch(dowodModule.KANAL_DOWODOW).catch(() => null);
-        if (!kanałDowodow) return interaction.reply({ content: 'Nie znaleziono kanału docelowego dowodów.', ephemeral: true });
+        if (!kanałDowodow) return interaction.followUp({ content: 'Nie znaleziono kanału docelowego dowodów.', ephemeral: true });
 
         const dane = wniosek.dane;
         const tekstDowodu = `🪪 DOWÓD OSOBISTY (<@${targetUserId}>) | OBYWATEL POLSKICH DRÓG \n\n` +
@@ -567,12 +640,12 @@ client.on('interactionCreate', async interaction => {
         embed.setDescription(`✅ **Wniosek zaakceptowany przez <@${interaction.user.id}>**\n\n` + embed.data.description);
 
         await interaction.message.edit({ embeds: [embed], components: [disabledRow] });
-        return interaction.reply({ content: 'Zaakceptowano wniosek i utworzono dowód.', ephemeral: true });
+        return interaction.followUp({ content: 'Zaakceptowano wniosek i utworzono dowód.', ephemeral: true });
     }
 
     if (akcja === 'akceptuj' && typ === 'edytuj') {
         const istniejacyDowod = await pobierzLubOdzyskajDowod(interaction, targetUserId);
-        if (!istniejacyDowod) return interaction.reply({ content: 'Użytkownik nie ma aktywnego dowodu.', ephemeral: true });
+        if (!istniejacyDowod) return interaction.followUp({ content: 'Użytkownik nie ma aktywnego dowodu.', ephemeral: true });
 
         const kanałDowodow = await interaction.guild.channels.fetch(dowodModule.KANAL_DOWODOW).catch(() => null);
         const staryWpis = kanałDowodow ? await kanałDowodow.messages.fetch(istniejacyDowod.wiadomoscId).catch(() => null) : null;
@@ -599,7 +672,7 @@ client.on('interactionCreate', async interaction => {
         embed.setDescription(`✅ **Edycja zatwierdzona przez <@${interaction.user.id}>**\n\n` + embed.data.description);
 
         await interaction.message.edit({ embeds: [embed], components: [disabledRow] });
-        return interaction.reply({ content: 'Zaktualizowano dowód użytkownika.', ephemeral: true });
+        return interaction.followUp({ content: 'Zaktualizowano dowód użytkownika.', ephemeral: true });
     }
 
     if (akcja === 'akceptuj' && typ === 'usun') {
@@ -617,7 +690,7 @@ client.on('interactionCreate', async interaction => {
         embed.setDescription(`⚠️ **Usunięcie dowodu zatwierdzone przez <@${interaction.user.id}>**\n\n` + embed.data.description);
 
         await interaction.message.edit({ embeds: [embed], components: [disabledRow] });
-        return interaction.reply({ content: 'Usunięto dowód użytkownika.', ephemeral: true });
+        return interaction.followUp({ content: 'Usunięto dowód użytkownika.', ephemeral: true });
     }
 });
 
