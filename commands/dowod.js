@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { sendLog } = require('../utils/logs');
 
 const dowodyDB = new Map();
 const wnioskiDB = new Map();
@@ -104,6 +105,14 @@ module.exports = {
 
             const msg = await channel.send({ embeds: [embed], components: [row] });
             wnioskiDB.set(msg.id, { type: 'usun', userId, dane });
+
+            await sendLog(interaction.client, {
+                title: 'Złożono Wniosek o Usunięcie Dowodu',
+                description: `Użytkownik złożył wniosek o usunięcie dowodu.\n\n• **Użytkownik:** <@${userId}>\n• **Kanał wniosków:** <#${KANAL_WNIOSKOW}>`,
+                color: 0xe67e22,
+                executor: interaction.user
+            });
+
             return interaction.reply({ content: '✅ Wniosek o usunięcie dowodu został wysłany do administracji.', ephemeral: true });
         }
     },
@@ -146,10 +155,10 @@ module.exports = {
                         const istniejacyDowod = dowodyDB.get(userId) || await pobierzLubOdzyskajDowod(interaction.guild, userId);
                         const starych = istniejacyDowod ? istniejacyDowod.dane : {};
                         embed.setTitle('Wniosek o edycję dowodu osobistego').setColor(0x3498db)
-                            .setDescription(`**Właściciel:** <@${userId}>\n\n### 🔴 Dane przed zmianą:\n• **Imię i Nazwisko:** ${starych.imie || 'Brak'}\n• **Data urodzenia:** ${starych.data_ur || 'Brak'}\n• **Miejsce urodzenia:** ${starych.miejsce_ur || 'Brak'}\n• **Płeć:** ${starych.plec || 'Brak'}\n• **Nick Roblox:** ${starych.roblox || 'Brak'}\n• **Nick Discord:** ${starych.discord || 'Brak'}\n• **Praca:** ${starych.praca || 'Brak'}\n\n### 🟢 Dane po zmianie (Nowe):\n• **Imię i Nazwisko:** ${pelneDane.imie}\n• **Data urodzenia:** ${pelneDane.data_ur}\n• **Miejsce urodzenia:** ${pelneDane.miejsce_ur}\n• **Płeć:** ${pelneDane.plec}\n• **Nick Roblox:** ${pelneDane.roblox}\n• **Nick Discord:** ${pelneDane.discord}\n• **Praca:** ${pelneDane.praca}`);
+                            .setDescription(`**Właściciel:** <@${userId}>\n\n### Dane przed zmianą:\n• **Imię:** ${starych.imie \vert{}\vert{} 'Brak'}\n• **Roblox:** ${starych.roblox || 'Brak'}\n\n### Dane po zmianie (Nowe):\n• **Imię:** ${pelneDane.imie}\n• **Roblox:** ${pelneDane.roblox}`);
                     } else {
                         embed.setTitle('Nowy wniosek o dowód osobisty').setColor(0x3498db)
-                            .setDescription(`**Właściciel:** <@${userId}>\n\n**Imię i Nazwisko:** ${pelneDane.imie}\n**Data urodzenia:** ${pelneDane.data_ur}\n**Miejsce urodzenia:** ${pelneDane.miejsce_ur}\n**Płeć:** ${pelneDane.plec}\n**Nick Roblox:** ${pelneDane.roblox}\n**Nick Discord:** ${pelneDane.discord}\n**Aktualna praca:** ${pelneDane.praca}`);
+                            .setDescription(`**Właściciel:** <@${userId}>\n\n**Imię i Nazwisko:** ${pelneDane.imie}\n**Data urodzenia:** ${pelneDane.data_ur}\n**Nick Roblox:** ${pelneDane.roblox}`);
                     }
 
                     const row = new ActionRowBuilder().addComponents(
@@ -160,6 +169,14 @@ module.exports = {
                     const msg = await channel.send({ embeds: [embed], components: [row] });
                     wnioskiDB.set(msg.id, { type: akcjaTyp, userId, dane: pelneDane });
                     tymczasoweDane.delete(userId);
+
+                    await sendLog(client, {
+                        title: `Złożono Wniosek o Dowód (${akcjaTyp.toUpperCase()})`,
+                        description: `Użytkownik wypełnił pełny formularz dowodu osobistego.\n\n• **Użytkownik:** <@${userId}>\n• **Typ:** ${akcjaTyp}`,
+                        color: 0x3498db,
+                        executor: interaction.user
+                    });
+
                     return interaction.reply({ content: '🎉 Wniosek został w pełni uzupełniony i wysłany do administracji!', ephemeral: true });
                 }
             }
@@ -194,8 +211,16 @@ module.exports = {
                 if (akcja === 'odrzuc') {
                     wnioskiDB.delete(interaction.message.id);
                     try { const user = await interaction.client.users.fetch(targetUserId); await user.send('Twoja prośba dotycząca dowodu osobistego została odrzucona przez administrację.'); } catch (e) {}
-                    embed.setColor(0xe74c3c).setDescription(`❌ **Wniosek odrzucony przez <@${interaction.user.id}>**\n\n` + embed.data.description);
+                    embed.setColor(0xe74c3c).setDescription(`Wniosek odrzucony.\n\n` + embed.data.description);
                     await interaction.message.edit({ embeds: [embed], components: [disabledRow] });
+
+                    await sendLog(interaction.client, {
+                        title: 'Odrzucono Wniosek o Dowód',
+                        description: `Administrator odrzucił wniosek użytkownika <@${targetUserId}>.`,
+                        color: 0xe74c3c,
+                        executor: interaction.user
+                    });
+
                     return interaction.followUp({ content: 'Odrzucono wniosek.', ephemeral: true });
                 }
 
@@ -203,12 +228,20 @@ module.exports = {
                     const kanalDowodow = await interaction.guild.channels.fetch(KANAL_DOWODOW).catch(() => null);
                     if (!kanalDowodow) return interaction.followUp({ content: 'Nie znaleziono kanału docelowego dowodów.', ephemeral: true });
                     const dane = wniosek.dane;
-                    const tekst = `🪪 DOWÓD OSOBISTY (<@${targetUserId}>) | OBYWATEL POLSKICH DRÓG \n\n**Dane Osobowe**\nImię i Nazwisko: ${dane.imie}\nData urodzenia: ${dane.data_ur}\nMiejsce urodzenia: ${dane.miejsce_ur}\nPłeć: (M/K) ${dane.plec}\nNick Roblox: ${dane.roblox}\nNick Discord: ${dane.discord}\nAktualna praca: ${dane.praca}`;
+                    const tekst = `🪪 DOWÓD OSOBISTY (<@${targetUserId}>) | OBYWATEL POLSKICH DRÓG \n\n**Dane Osobowe**\nImię i Nazwisko: ${dane.imie}\nData urodzenia: ${dane.data_ur}\nMiejsce urodzenia:${dane.miejsce_ur}\nPłeć: (M/K) ${dane.plec}\nNick Roblox:${dane.roblox}\nNick Discord: ${dane.discord}\nAktualna praca:${dane.praca}`;
                     const wyslanaWiadomosc = await kanalDowodow.send(tekst);
                     dowodyDB.set(targetUserId, { wiadomoscId: wyslanaWiadomosc.id, linkWiadomosci: wyslanaWiadomosc.url, dane });
                     wnioskiDB.delete(interaction.message.id);
-                    embed.setColor(0x2ecc71).setDescription(`✅ **Wniosek zaakceptowany przez <@${interaction.user.id}>**\n\n` + embed.data.description);
+                    embed.setColor(0x2ecc71).setDescription(`Zaakceptowano.\n\n` + embed.data.description);
                     await interaction.message.edit({ embeds: [embed], components: [disabledRow] });
+
+                    await sendLog(interaction.client, {
+                        title: 'Zaakceptowano Nowy Dowód',
+                        description: `Utworzono i zatwierdzono dowód dla <@${targetUserId}>.\n• **Link:** ${wyslanaWiadomosc.url}`,
+                        color: 0x2ecc71,
+                        executor: interaction.user
+                    });
+
                     return interaction.followUp({ content: 'Zaakceptowano wniosek i utworzono dowód.', ephemeral: true });
                 }
 
@@ -218,12 +251,20 @@ module.exports = {
                     const kanalDowodow = await interaction.guild.channels.fetch(KANAL_DOWODOW).catch(() => null);
                     const staryWpis = kanalDowodow ? await kanalDowodow.messages.fetch(istniejacyDowod.wiadomoscId).catch(() => null) : null;
                     const dane = wniosek.dane;
-                    const nowyTekst = `🪪 DOWÓD OSOBISTY (<@${targetUserId}>) | OBYWATEL POLSKICH DRÓG \n\n**Dane Osobowe**\nImię i Nazwisko: ${dane.imie}\nData urodzenia: ${dane.data_ur}\nMiejsce urodzenia: ${dane.miejsce_ur}\nPłeć: (M/K) ${dane.plec}\nNick Roblox: ${dane.roblox}\nNick Discord: ${dane.discord}\nAktualna praca: ${dane.praca}`;
+                    const nowyTekst = `🪪 DOWÓD OSOBISTY (<@${targetUserId}>) | OBYWATEL POLSKICH DRÓG \n\n**Dane Osobowe**\nImię i Nazwisko: ${dane.imie}\nData urodzenia: ${dane.data_ur}\nMiejsce urodzenia:${dane.miejsce_ur}\nPłeć: (M/K) ${dane.plec}\nNick Roblox:${dane.roblox}\nNick Discord: ${dane.discord}\nAktualna praca:${dane.praca}`;
                     if (staryWpis) await staryWpis.edit(nowyTekst);
                     istniejacyDowod.dane = dane;
                     wnioskiDB.delete(interaction.message.id);
-                    embed.setColor(0x2ecc71).setDescription(`✅ **Edycja zatwierdzona przez <@${interaction.user.id}>**\n\n` + embed.data.description);
+                    embed.setColor(0x2ecc71).setDescription(`Zatwierdzono edycję.\n\n` + embed.data.description);
                     await interaction.message.edit({ embeds: [embed], components: [disabledRow] });
+
+                    await sendLog(interaction.client, {
+                        title: 'Zaktualizowano Dowód Osobisty',
+                        description: `Zatwierdzono edycję dowodu dla <@${targetUserId}>.`,
+                        color: 0x2ecc71,
+                        executor: interaction.user
+                    });
+
                     return interaction.followUp({ content: 'Zaktualizowano dowód użytkownika.', ephemeral: true });
                 }
 
@@ -236,8 +277,16 @@ module.exports = {
                         dowodyDB.delete(targetUserId);
                     }
                     wnioskiDB.delete(interaction.message.id);
-                    embed.setColor(0xf1c40f).setDescription(`⚠️ **Usunięcie dowodu zatwierdzone przez <@${interaction.user.id}>**\n\n` + embed.data.description);
+                    embed.setColor(0xf1c40f).setDescription(`Usunięto dowód.\n\n` + embed.data.description);
                     await interaction.message.edit({ embeds: [embed], components: [disabledRow] });
+
+                    await sendLog(interaction.client, {
+                        title: 'Usunięto Dowód Osobisty',
+                        description: `Zatwierdzono usunięcie dowodu dla <@${targetUserId}>.`,
+                        color: 0xe74c3c,
+                        executor: interaction.user
+                    });
+
                     return interaction.followUp({ content: 'Usunięto dowód użytkownika.', ephemeral: true });
                 }
             }
