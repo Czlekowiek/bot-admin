@@ -39,7 +39,8 @@ module.exports = {
 
         const embed = new EmbedBuilder()
             .setColor(0xFFCE00)
-            .setDescription(`# <:verify_green:1548654937620222052> Weryfikacja\n\n## Aby się zweryfikować, kliknij przycisk "Zweryfikuj" pod tą wiadomością i przepisz kod z okienka.`);
+            .setDescription(`# <:verify_green:1548654937620222052> Weryfikacja\n\n## Aby się zweryfikować, kliknij przycisk "<:verify_green:1548654937620222052> Zweryfikuj", przepisz w pole tekstowe pięciocyfrowy kod i kliknij "Wyślij".`);
+            .setFooter('W razie problemów z weryfikacją, napisz wiadomość prywatną do @czlekowiek');
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
