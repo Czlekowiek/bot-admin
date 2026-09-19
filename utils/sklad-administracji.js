@@ -15,34 +15,24 @@ const ROLES_TO_TRACK = [
 ];
 
 async function generateStaffEmbed(guild) {
-    if (guild) {
-        await guild.members.fetch().catch(() => {});
-    }
+    if (guild) await guild.members.fetch().catch(() => {});
 
     let descriptionText = '# <:staff:1548644739237027902> Skład administracji serwera\n';
 
     if (guild) {
         for (const roleData of ROLES_TO_TRACK) {
             const role = await guild.roles.fetch(roleData.id).catch(() => null);
-            
-            let membersList = '<:arrow:1543977081233342494> Brak osób';
-            
-            if (role && role.members.size > 0) {
-                membersList = role.members.map(member => `<:arrow:1543977081233342494> <@${member.id}>`).join('\n');
-            }
+            const membersList = role && role.members.size > 0 
+                ? role.members.map(m => `<:arrow:1543977081233342494> <@${m.id}>`).join('\n') 
+                : '<:arrow:1543977081233342494> Brak osób';
 
             descriptionText += `## ${roleData.name}\n${membersList}\n`;
         }
     }
 
-    const now = new Date();
-    const formattedTime = now.toLocaleString('pl-PL', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
+    const formattedTime = new Date().toLocaleString('pl-PL', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
     });
 
     return new EmbedBuilder()
