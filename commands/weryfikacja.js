@@ -1,7 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, PermissionFlagsBits } = require('discord.js');
 
 const captchaStorage = new Map();
-
 const ROLA_NIEZWERYFIKOWANY = '1550876638013685901';
 const ROLA_ZWERYFIKOWANY = '1542126972669403178';
 const KANAL_WERYFIKACJI = '1544013529353294004';
@@ -33,21 +32,14 @@ module.exports = {
             if (chObj.isThread && chObj.isThread()) continue;
 
             try {
-                await chObj.permissionOverwrites.edit(ROLA_NIEZWERYFIKOWANY, {
-                    ViewChannel: false
-                });
+                await chObj.permissionOverwrites.edit(ROLA_NIEZWERYFIKOWANY, { ViewChannel: false });
                 updatedChannels++;
-            } catch (error) {
-                console.error(`Nie udało się zaktualizować permisji dla kanału ${chObj.name}:`, error.message);
-            }
+            } catch (error) {}
         }
 
         const embed = new EmbedBuilder()
             .setColor(0xFFCE00)
-            .setDescription(
-                `# <:verify_green:1548654937620222052> Weryfikacja\n\n` +
-                `## Aby się zweryfikować, kliknij przycisk "Zweryfikuj" pod tą wiadomością i przepisz kod z okienka.`
-            );
+            .setDescription(`# <:verify_green:1548654937620222052> Weryfikacja\n\n## Aby się zweryfikować, kliknij przycisk "Zweryfikuj" pod tą wiadomością i przepisz kod z okienka.`);
 
         const row = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
@@ -58,35 +50,29 @@ module.exports = {
         );
 
         await channel.send({ embeds: [embed], components: [row] });
-
         return interaction.editReply(`✅ Pomyślnie wysłano panel weryfikacyjny oraz zaktualizowano uprawnienia dla **${updatedChannels}** kanałów!`);
     },
 
     setupEvents(client) {
+        // Automatyczne nadawanie roli po dołączeniu
         client.on('guildMemberAdd', async member => {
             try {
-                await member.roles.add(ROLA_NIEZWERYFIKOWANY);
-            } catch (error) {
-                console.error('Nie udało się nadać roli niezweryfikowanego:', error);
-            }
+                await member.roles.add(ROLA_NIEZWERYFIKOWANY).catch(() => {});
+            } catch (error) {}
         });
 
+        // Ukrywanie nowo tworzonych kanałów dla niezweryfikowanych
         client.on('channelCreate', async channel => {
-            if (!channel.guild) return;
-            if (channel.id === KANAL_WERYFIKACJI) return;
+            if (!channel.guild || channel.id === KANAL_WERYFIKACJI) return;
             if (channel.isThread && channel.isThread()) return;
 
             try {
-                await channel.permissionOverwrites.edit(ROLA_NIEZWERYFIKOWANY, {
-                    ViewChannel: false
-                });
-            } catch (error) {
-                console.error('Nie udało się ustawić permisji dla nowego kanału:', error);
-            }
+                await channel.permissionOverwrites.edit(ROLA_NIEZWERYFIKOWANY, { ViewChannel: false });
+            } catch (error) {}
         });
 
+        // Obsługa interakcji weryfikacji (Przycisk i Modal)
         client.on('interactionCreate', async interaction => {
-            // Obsługa przycisku - natychmiastowe pokazanie modala
             if (interaction.isButton() && interaction.customId === 'start_verification_modal') {
                 const code = generateRandomDigits();
                 captchaStorage.set(interaction.user.id, code);
@@ -107,10 +93,9 @@ module.exports = {
                 return await interaction.showModal(modal);
             }
 
-            // Obsługa przesłanego modala
             if (interaction.isModalSubmit() && interaction.customId === 'verification_modal_submit') {
                 await interaction.deferReply({ ephemeral: true });
-                
+
                 const userInput = interaction.fields.getTextInputValue('verification_code_input').trim();
                 const expectedCode = captchaStorage.get(interaction.user.id);
 
@@ -119,17 +104,15 @@ module.exports = {
                 }
 
                 captchaStorage.delete(interaction.user.id);
-
                 const member = interaction.member;
+
                 try {
                     if (member.roles.cache.has(ROLA_NIEZWERYFIKOWANY)) {
                         await member.roles.remove(ROLA_NIEZWERYFIKOWANY);
                     }
                     await member.roles.add(ROLA_ZWERYFIKOWANY);
-
-                    return interaction.editReply({ content: '<a:greentick:1543991524738465853> Pomyślnie przeszperano weryfikację! Witaj na serwerze.' });
+                    return interaction.editReply({ content: '<a:greentick:1543991524738465853> Pomyślnie zweryfikowano! Witaj na serwerze.' });
                 } catch (error) {
-                    console.error('Błąd podczas zmiany ról weryfikacji:', error);
                     return interaction.editReply({ content: '<a:redtick:1543991522192527450> Wystąpił błąd podczas nadawania ról. Powiadom administrację.' });
                 }
             }
