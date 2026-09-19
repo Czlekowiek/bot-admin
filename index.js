@@ -176,4 +176,4 @@ client.on('interactionCreate', async interaction => {
 process.on('SIGINT', () => { process.exit(0); });
 process.on('SIGTERM', () => { process.exit(0); });
 
-client.login('MTU0ODYzNjU3NTEyMDc1MjY4MQ.GMbXfK.dEs0hkRP1k0oDVIZKz1kck0nnMbYJmAiaw64cU');
+client.login(process.env.DISCORD_TOKEN);
