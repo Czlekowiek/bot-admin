@@ -1,10 +1,11 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { sendLog } = require('../utils/logs');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('reklama')
         .setDescription('Wysyła reklamę serwera w ładnym embedzie')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator) // Zablokowanie komendy tylko dla administratorów
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
         .addStringOption(option =>
             option.setName('nazwa')
                 .setDescription('Nazwa reklamowanego serwera')
@@ -33,7 +34,6 @@ module.exports = {
         const przedstawiciel = interaction.options.getUser('przedstawiciel');
         let logo = interaction.options.getString('logo');
 
-        // Czyszczenie linku z ewentualnych nawiasów ostrokątnych (<...>)
         if (link.startsWith('<') && link.endsWith('>')) {
             link = link.slice(1, -1);
         }
@@ -45,10 +45,8 @@ module.exports = {
             }
         }
 
-        // Składanie całego opisu zgodnie z nowym formatem
-        const finalDescription = `# ${nazwa}\n\n${tresc}\n\n## ⛓️ Link do serwera: [Kliknij, aby dołączyć!](${link})\n||${przedstawiciel}||`;
+        const finalDescription = `# ${nazwa}\n\n${tresc}\n\n## ⛓️ Link do serwera: [Kliknij, aby dołączyć!](${link})\n\vert{}\vert{}${przedstawiciel}||`;
 
-        // Budowanie embeda w kolorze #FFCE00
         const reklamaEmbed = new EmbedBuilder()
             .setDescription(finalDescription)
             .setColor(0xFFCE00)
@@ -58,10 +56,16 @@ module.exports = {
             })
             .setTimestamp();
 
-        // Jeśli podano opcjonalne logo, ustawiamy je jako miniaturę (thumbnail)
         if (logo) {
             reklamaEmbed.setThumbnail(logo);
         }
+
+        await sendLog(interaction.client, {
+            title: 'Wysłano Reklamę / Współpracę',
+            description: `Administrator wysłał nową reklamę serwera.\n\n• **Serwer:** ${nazwa}\n• **Przedstawiciel:** <@${przedstawiciel.id}>\n• **Link:** ${link}`,
+            color: 0xf1c40f,
+            executor: interaction.user
+        });
 
         return interaction.reply({ embeds: [reklamaEmbed] });
     },
