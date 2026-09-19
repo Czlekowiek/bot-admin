@@ -25,13 +25,11 @@ module.exports = {
             return interaction.editReply('❌ Nie znaleziono kanału weryfikacji o podanym ID!');
         }
 
-        // Pobranie świeżej listy kanałów bezpośrednio z serwera
         const channels = await guild.channels.fetch();
         let updatedChannels = 0;
 
         for (const [chId, chObj] of channels) {
             if (!chObj || chId === KANAL_WERYFIKACJI) continue;
-            // Pomijamy wątki, bo nie mają standardowych uprawnień kanału głównego
             if (chObj.isThread && chObj.isThread()) continue;
 
             try {
@@ -44,11 +42,10 @@ module.exports = {
             }
         }
 
-        // Wysłanie wiadomości weryfikacyjnej
         const embed = new EmbedBuilder()
             .setColor(0xFFCE00)
             .setDescription(
-                `# <:verified:1543971649433641050> Weryfikacja\n\n` +
+                `# <:verify_green:1548654937620222052> Weryfikacja\n\n` +
                 `## Aby się zweryfikować, kliknij przycisk "Zweryfikuj" pod tą wiadomością i przepisz kod z okienka.`
             );
 
@@ -57,7 +54,7 @@ module.exports = {
                 .setCustomId('start_verification_modal')
                 .setLabel('Zweryfikuj')
                 .setStyle(ButtonStyle.Success)
-                .setEmoji('🛡️')
+                .setEmoji('<:verify_green:1548654937620222052>')
         );
 
         await channel.send({ embeds: [embed], components: [row] });
@@ -66,7 +63,6 @@ module.exports = {
     },
 
     setupEvents(client) {
-        // Automatyczna rola po dołączeniu na serwer
         client.on('guildMemberAdd', async member => {
             try {
                 await member.roles.add(ROLA_NIEZWERYFIKOWANY);
@@ -75,7 +71,6 @@ module.exports = {
             }
         });
 
-        // Automatyczne ukrywanie nowo tworzonych kanałów
         client.on('channelCreate', async channel => {
             if (!channel.guild) return;
             if (channel.id === KANAL_WERYFIKACJI) return;
@@ -90,8 +85,8 @@ module.exports = {
             }
         });
 
-        // Obsługa modala i przycisku
         client.on('interactionCreate', async interaction => {
+            // Obsługa przycisku - natychmiastowe pokazanie modala
             if (interaction.isButton() && interaction.customId === 'start_verification_modal') {
                 const code = generateRandomDigits();
                 captchaStorage.set(interaction.user.id, code);
@@ -112,12 +107,15 @@ module.exports = {
                 return await interaction.showModal(modal);
             }
 
+            // Obsługa przesłanego modala
             if (interaction.isModalSubmit() && interaction.customId === 'verification_modal_submit') {
+                await interaction.deferReply({ ephemeral: true });
+                
                 const userInput = interaction.fields.getTextInputValue('verification_code_input').trim();
                 const expectedCode = captchaStorage.get(interaction.user.id);
 
                 if (!expectedCode || userInput !== expectedCode) {
-                    return interaction.reply({ content: '❌ Błędny kod! Kliknij przycisk "Zweryfikuj" ponownie.', ephemeral: true });
+                    return interaction.editReply({ content: '❌ Błędny kod! Kliknij przycisk "Zweryfikuj" ponownie.' });
                 }
 
                 captchaStorage.delete(interaction.user.id);
@@ -129,10 +127,10 @@ module.exports = {
                     }
                     await member.roles.add(ROLA_ZWERYFIKOWANY);
 
-                    return interaction.reply({ content: '✅ Pomyślnie przeszperano weryfikację! Witaj na serwerze.', ephemeral: true });
+                    return interaction.editReply({ content: '✅ Pomyślnie przeszperano weryfikację! Witaj na serwerze.' });
                 } catch (error) {
                     console.error('Błąd podczas zmiany ról weryfikacji:', error);
-                    return interaction.reply({ content: '❌ Wystąpił błąd podczas nadawania ról. Powiadom administrację.', ephemeral: true });
+                    return interaction.editReply({ content: '❌ Wystąpił błąd podczas nadawania ról. Powiadom administrację.' });
                 }
             }
         });
