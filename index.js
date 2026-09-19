@@ -148,33 +148,63 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 });
 
 // =========================================================
-// TABLICA AKTYWNOŚCI (OBSŁUGA REAKCJI NA ŻYWO)
+// HISTORIA REAKCJI I TABLICA AKTYWNOŚCI (STARE FUNKCJE)
 // =========================================================
 
-async function handleReactionChange(reaction) {
+const reactionHistory = new Map();
+
+async function getOrCreateUsersList(reaction) {
+    const msgId = reaction.message.id;
+    if (!reactionHistory.has(msgId)) {
+        const usersMap = await reaction.users.fetch({ limit: 100 });
+        const usersList = [];
+        for (const [userId, user] of usersMap) {
+            if (!user.bot) {
+                usersList.push(userId);
+            }
+        }
+        reactionHistory.set(msgId, usersList);
+    }
+    return reactionHistory.get(msgId);
+}
+
+client.on('messageReactionAdd', async (reaction, user) => {
+    if (user.bot) return;
     if (reaction.partial) {
         try { await reaction.fetch(); } catch { return; }
     }
     if (reaction.message.partial) {
         try { await reaction.message.fetch(); } catch { return; }
     }
-    // Sprawdzamy czy to właściwa emotka aktywności
     if (reaction.emoji.id !== '1543969158646206475') return;
 
-    const message = reaction.message;
-    if (!message.embeds.length) return;
-
-    // Pobieramy aktualną listę użytkowników bezpośrednio z Discorda
-    const usersMap = await reaction.users.fetch({ limit: 100 }).catch(() => null);
-    const usersList = [];
-
-    if (usersMap) {
-        for (const [userId, user] of usersMap) {
-            if (!user.bot) {
-                usersList.push(userId);
-            }
-        }
+    const usersList = await getOrCreateUsersList(reaction);
+    if (!usersList.includes(user.id)) {
+        usersList.push(user.id);
     }
+    await updateActivityBoard(reaction.message, usersList);
+});
+
+client.on('messageReactionRemove', async (reaction, user) => {
+    if (user.bot) return;
+    if (reaction.partial) {
+        try { await reaction.fetch(); } catch { return; }
+    }
+    if (reaction.message.partial) {
+        try { await reaction.message.fetch(); } catch { return; }
+    }
+    if (reaction.emoji.id !== '1543969158646206475') return;
+
+    const usersList = await getOrCreateUsersList(reaction);
+    const index = usersList.indexOf(user.id);
+    if (index > -1) {
+        usersList.splice(index, 1);
+    }
+    await updateActivityBoard(reaction.message, usersList);
+});
+
+async function updateActivityBoard(message, usersList) {
+    if (!message.embeds.length) return;
 
     const embed = message.embeds[0];
     const description = embed.description;
@@ -197,18 +227,9 @@ async function handleReactionChange(reaction) {
     }
 
     const updatedEmbed = EmbedBuilder.from(embed).setDescription(newDescription);
+
     await message.edit({ embeds: [updatedEmbed] });
 }
-
-client.on('messageReactionAdd', async (reaction, user) => {
-    if (user.bot) return;
-    await handleReactionChange(reaction);
-});
-
-client.on('messageReactionRemove', async (reaction, user) => {
-    if (user.bot) return;
-    await handleReactionChange(reaction);
-});
 
 // =========================================================
 // UNIWERSALNA OBSŁUGA KOMEND SLASH
