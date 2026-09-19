@@ -1,11 +1,10 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-const { sendLog } = require('../utils/logs');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('reklama')
         .setDescription('Wysyła reklamę serwera w ładnym embedzie')
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator) // Zablokowanie komendy tylko dla administratorów
         .addStringOption(option =>
             option.setName('nazwa')
                 .setDescription('Nazwa reklamowanego serwera')
@@ -34,6 +33,7 @@ module.exports = {
         const przedstawiciel = interaction.options.getUser('przedstawiciel');
         let logo = interaction.options.getString('logo');
 
+        // Czyszczenie linku z ewentualnych nawiasów ostrokątnych (<...>)
         if (link.startsWith('<') && link.endsWith('>')) {
             link = link.slice(1, -1);
         }
@@ -45,8 +45,10 @@ module.exports = {
             }
         }
 
-        const finalDescription = `# ${nazwa}\n\n${tresc}\n\n## ⛓️ Link do serwera: [Kliknij, aby dołączyć!](${link})\n\vert{}\vert{}${przedstawiciel}||`;
+        // Składanie całego opisu zgodnie z nowym formatem
+        const finalDescription = `# ${nazwa}\n\n${tresc}\n\n## ⛓️ Link do serwera: [Kliknij, aby dołączyć!](${link})\n||${przedstawiciel}||`;
 
+        // Budowanie embeda w kolorze #FFCE00
         const reklamaEmbed = new EmbedBuilder()
             .setDescription(finalDescription)
             .setColor(0xFFCE00)
@@ -56,16 +58,19 @@ module.exports = {
             })
             .setTimestamp();
 
+        // Jeśli podano opcjonalne logo, ustawiamy je jako miniaturę (thumbnail)
         if (logo) {
             reklamaEmbed.setThumbnail(logo);
         }
 
-        await sendLog(interaction.client, {
-            title: 'Wysłano Reklamę / Współpracę',
-            description: `Administrator wysłał nową reklamę serwera.\n\n• **Serwer:** ${nazwa}\n• **Przedstawiciel:** <@${przedstawiciel.id}>\n• **Link:** ${link}`,
-            color: 0xf1c40f,
-            executor: interaction.user
-        });
+        // Wysłanie logu na kanał (jeśli funkcja sendLog jest dostępna globalnie w kliencie/indeksie lub zaimportowana)
+        try {
+            if (interaction.client && typeof interaction.client.sendLog === 'function') {
+                await interaction.client.sendLog(`📢 **${interaction.user.tag}** wysłał reklamę serwera: **${nazwa}** na kanale <#${interaction.channelId}>.`);
+            }
+        } catch (err) {
+            console.error('Błąd logowania reklamy:', err);
+        }
 
         return interaction.reply({ embeds: [reklamaEmbed] });
     },
