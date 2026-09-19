@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, PermissionFlagsBits } = require('discord.js');
+const { sendLog } = require('../utils/logs');
 
 const captchaStorage = new Map();
 const ROLA_NIEZWERYFIKOWANY = '1550876638013685901';
@@ -39,7 +40,7 @@ module.exports = {
 
         const embed = new EmbedBuilder()
             .setColor(0xFFCE00)
-            .setDescription(`# <:verify_green:1548654937620222052> Weryfikacja\n\n## Aby się zweryfikować, kliknij przycisk "<:verify_green:1548654937620222052> Zweryfikuj", przepisz kod weryfikacyjny i kliknij "wyślij".`)
+            .setDescription(`# Weryfikacja\n\n## Aby się zweryfikować, kliknij przycisk "Zweryfikuj", przepisz kod weryfikacyjny i kliknij "wyślij".`)
             .setFooter({ text: 'W razie problemów z weryfikacją, napisz wiadomość prywatną do @czlekowiek' });
 
         const row = new ActionRowBuilder().addComponents(
@@ -47,32 +48,36 @@ module.exports = {
                 .setCustomId('start_verification_modal')
                 .setLabel('Zweryfikuj')
                 .setStyle(ButtonStyle.Success)
-                .setEmoji('<:verify_green:1548654937620222052>')
         );
 
         await channel.send({ embeds: [embed], components: [row] });
+
+        await sendLog(interaction.client, {
+            title: 'Skonfigurowano Panel Weryfikacji',
+            description: `Wysłano panel weryfikacyjny na kanał <#${KANAL_WERYFIKACJI}> i zaktualizowano uprawnienia dla${updatedChannels} kanałów.`,
+            color: 0x2ecc71,
+            executor: interaction.user
+        });
+
         return interaction.editReply(`✅ Pomyślnie wysłano panel weryfikacyjny oraz zaktualizowano uprawnienia dla **${updatedChannels}** kanałów!`);
     },
 
     setupEvents(client) {
-        // Automatyczne nadawanie roli po dołączeniu
         client.on('guildMemberAdd', async member => {
             try {
                 await member.roles.add(ROLA_NIEZWERYFIKOWANY).catch(() => {});
             } catch (error) {}
         });
 
-        // Ukrywanie nowo tworzonych kanałów dla niezweryfikowanych
         client.on('channelCreate', async channel => {
-            if (!channel.guild || channel.id === KANAL_WERYFIKACJI) return;
-            if (channel.isThread && channel.isThread()) return;
+            if (!channel.guild || channel.id === KANAL_WERYFIKACJI) continue;
+            if (channel.isThread && channel.isThread()) continue;
 
             try {
                 await channel.permissionOverwrites.edit(ROLA_NIEZWERYFIKOWANY, { ViewChannel: false });
             } catch (error) {}
         });
 
-        // Obsługa interakcji weryfikacji (Przycisk i Modal)
         client.on('interactionCreate', async interaction => {
             if (interaction.isButton() && interaction.customId === 'start_verification_modal') {
                 const code = generateRandomDigits();
@@ -101,7 +106,13 @@ module.exports = {
                 const expectedCode = captchaStorage.get(interaction.user.id);
 
                 if (!expectedCode || userInput !== expectedCode) {
-                    return interaction.editReply({ content: '<a:redtick:1543991522192527450> Błędny kod! Kliknij przycisk "Zweryfikuj" ponownie.' });
+                    await sendLog(interaction.client, {
+                        title: 'Błąd Weryfikacji (Błędny Kod)',
+                        description: `Użytkownik wpisał błędny kod captcha.\n\n• **Użytkownik:** <@${interaction.user.id}> (\`${interaction.user.tag}\`)\n• **Wpisany kod:** \`${userInput}\`\n• **Oczekiwany kod:** \`${expectedCode}\``,
+                        color: 0xe74c3c,
+                        executor: interaction.user
+                    });
+                    return interaction.editReply({ content: 'Błędny kod! Kliknij przycisk "Zweryfikuj" ponownie.' });
                 }
 
                 captchaStorage.delete(interaction.user.id);
@@ -112,9 +123,23 @@ module.exports = {
                         await member.roles.remove(ROLA_NIEZWERYFIKOWANY);
                     }
                     await member.roles.add(ROLA_ZWERYFIKOWANY);
-                    return interaction.editReply({ content: '<a:greentick:1543991524738465853> Pomyślnie zweryfikowano! Witaj na serwerze.' });
+
+                    await sendLog(interaction.client, {
+                        title: 'Pomyślna Weryfikacja',
+                        description: `Użytkownik pomyślnie ukończył weryfikację i otrzymał odpowiednie role.\n\n• **Użytkownik:** <@${interaction.user.id}> (\`${interaction.user.tag}\`)`,
+                        color: 0x2ecc71,
+                        executor: interaction.user
+                    });
+
+                    return interaction.editReply({ content: 'Pomyślnie zweryfikowano! Witaj na serwerze.' });
                 } catch (error) {
-                    return interaction.editReply({ content: '<a:redtick:1543991522192527450> Wystąpił błąd podczas nadawania ról. Powiadom administrację.' });
+                    await sendLog(interaction.client, {
+                        title: 'Błąd Ról podczas Weryfikacji',
+                        description: `Nie udało się nadać ról użytkownikowi <@${interaction.user.id}>.`,
+                        color: 0xe74c3c,
+                        executor: interaction.user
+                    });
+                    return interaction.editReply({ content: 'Wystąpił błąd podczas nadawania ról. Powiadom administrację.' });
                 }
             }
         });
