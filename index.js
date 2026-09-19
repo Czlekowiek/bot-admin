@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
-const { Client, GatewayIntentBits, Partials, Collection, REST, Routes } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Collection, REST, Routes, EmbedBuilder } = require('discord.js');
 
 const { generateStaffEmbed } = require('./utils/sklad-administracji');
 const { sendWelcomeMessage } = require('./utils/welcome');
@@ -145,6 +145,69 @@ client.on('guildMemberRemove', async member => {
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
     await updateAdminMessage(newMember.guild);
+});
+
+// =========================================================
+// TABLICA AKTYWNOŚCI (OBSŁUGA REAKCJI NA ŻYWO)
+// =========================================================
+
+async function handleReactionChange(reaction) {
+    if (reaction.partial) {
+        try { await reaction.fetch(); } catch { return; }
+    }
+    if (reaction.message.partial) {
+        try { await reaction.message.fetch(); } catch { return; }
+    }
+    // Sprawdzamy czy to właściwa emotka aktywności
+    if (reaction.emoji.id !== '1543969158646206475') return;
+
+    const message = reaction.message;
+    if (!message.embeds.length) return;
+
+    // Pobieramy aktualną listę użytkowników bezpośrednio z Discorda
+    const usersMap = await reaction.users.fetch({ limit: 100 }).catch(() => null);
+    const usersList = [];
+
+    if (usersMap) {
+        for (const [userId, user] of usersMap) {
+            if (!user.bot) {
+                usersList.push(userId);
+            }
+        }
+    }
+
+    const embed = message.embeds[0];
+    const description = embed.description;
+    const opisMatch = description.split(/### <:arrow:1543977081233342494> Opis: /);
+    const activityDescription = opisMatch[1] ? opisMatch[1] : null;
+
+    const top1 = usersList[0] ? `<@${usersList[0]}>` : 'Brak';
+    const top2 = usersList[1] ? `<@${usersList[1]}>` : 'Brak';
+    const top3 = usersList[2] ? `<@${usersList[2]}>` : 'Brak';
+
+    let newDescription =
+        `# <a:checkmark:1543969158646206475> Aktywność check\n` +
+        `## <a:top1:1548673656761352304> ${top1}\n` +
+        `## <a:top2:1548673747983011891> ${top2}\n` +
+        `## <a:top3:1548673801104138322> ${top3}\n\n` +
+        `## <a:dot:1543969325155745812> Zareaguj emotką "<a:checkmark:1543969158646206475>" poniżej aby zaznaczyć aktywność.`;
+
+    if (activityDescription) {
+        newDescription += `\n\n### <:arrow:1543977081233342494> Opis: ${activityDescription}`;
+    }
+
+    const updatedEmbed = EmbedBuilder.from(embed).setDescription(newDescription);
+    await message.edit({ embeds: [updatedEmbed] });
+}
+
+client.on('messageReactionAdd', async (reaction, user) => {
+    if (user.bot) return;
+    await handleReactionChange(reaction);
+});
+
+client.on('messageReactionRemove', async (reaction, user) => {
+    if (user.bot) return;
+    await handleReactionChange(reaction);
 });
 
 // =========================================================
