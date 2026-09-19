@@ -1,9 +1,10 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('reklama')
         .setDescription('Wysyła reklamę serwera w ładnym embedzie')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator) // Zablokowanie komendy tylko dla administratorów
         .addStringOption(option =>
             option.setName('nazwa')
                 .setDescription('Nazwa reklamowanego serwera')
