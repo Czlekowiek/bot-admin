@@ -1,5 +1,4 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, PermissionFlagsBits } = require('discord.js');
-const { sendLog } = require('../utils/logs');
 
 const captchaStorage = new Map();
 const ROLA_NIEZWERYFIKOWANY = '1550876638013685901';
@@ -40,7 +39,7 @@ module.exports = {
 
         const embed = new EmbedBuilder()
             .setColor(0xFFCE00)
-            .setDescription(`# Weryfikacja\n\n## Aby się zweryfikować, kliknij przycisk "Zweryfikuj", przepisz kod weryfikacyjny i kliknij "wyślij".`)
+            .setDescription(`# <:verify_green:1548654937620222052> Weryfikacja\n\n## Aby się zweryfikować, kliknij przycisk "<:verify_green:1548654937620222052> Zweryfikuj", przepisz kod weryfikacyjny i kliknij "wyślij".`)
             .setFooter({ text: 'W razie problemów z weryfikacją, napisz wiadomość prywatną do @czlekowiek' });
 
         const row = new ActionRowBuilder().addComponents(
@@ -48,27 +47,35 @@ module.exports = {
                 .setCustomId('start_verification_modal')
                 .setLabel('Zweryfikuj')
                 .setStyle(ButtonStyle.Success)
+                .setEmoji('<:verify_green:1548654937620222052>')
         );
 
         await channel.send({ embeds: [embed], components: [row] });
 
-        await sendLog(interaction.client, {
-            title: 'Skonfigurowano Panel Weryfikacji',
-            description: `Wysłano panel weryfikacyjny na kanał <#${KANAL_WERYFIKACJI}> i zaktualizowano uprawnienia dla${updatedChannels} kanałów.`,
-            color: 0x2ecc71,
-            executor: interaction.user
-        });
+        // Logowanie akcji setupu weryfikacji
+        try {
+            if (interaction.client && typeof interaction.client.sendLog === 'function') {
+                await interaction.client.sendLog(`🛡️ **${interaction.user.tag}** skonfigurował panel weryfikacji na kanale <#${KANAL_WERYFIKACJI}> (zaktualizowano uprawnienia dla ${updatedChannels} kanałów).`);
+            }
+        } catch (err) {
+            console.error('Błąd logowania weryfikacji setup:', err);
+        }
 
         return interaction.editReply(`✅ Pomyślnie wysłano panel weryfikacyjny oraz zaktualizowano uprawnienia dla **${updatedChannels}** kanałów!`);
     },
 
     setupEvents(client) {
+        // Automatyczne nadawanie roli po dołączeniu
         client.on('guildMemberAdd', async member => {
             try {
                 await member.roles.add(ROLA_NIEZWERYFIKOWANY).catch(() => {});
+                if (typeof client.sendLog === 'function') {
+                    await client.sendLog(`📥 Nowy użytkownik **${member.user.tag}** dołączył na serwer – nadano rolę niezweryfikowanego.`);
+                }
             } catch (error) {}
         });
 
+        // Ukrywanie nowo tworzonych kanałów dla niezweryfikowanych
         client.on('channelCreate', async channel => {
             if (!channel.guild || channel.id === KANAL_WERYFIKACJI) return;
             if (channel.isThread && channel.isThread()) return;
@@ -78,6 +85,7 @@ module.exports = {
             } catch (error) {}
         });
 
+        // Obsługa interakcji weryfikacji (Przycisk i Modal)
         client.on('interactionCreate', async interaction => {
             if (interaction.isButton() && interaction.customId === 'start_verification_modal') {
                 const code = generateRandomDigits();
@@ -106,13 +114,13 @@ module.exports = {
                 const expectedCode = captchaStorage.get(interaction.user.id);
 
                 if (!expectedCode || userInput !== expectedCode) {
-                    await sendLog(interaction.client, {
-                        title: 'Błąd Weryfikacji (Błędny Kod)',
-                        description: `Użytkownik wpisał błędny kod captcha.\n\n• **Użytkownik:** <@${interaction.user.id}> (\`${interaction.user.tag}\`)\n• **Wpisany kod:** \`${userInput}\`\n• **Oczekiwany kod:** \`${expectedCode}\``,
-                        color: 0xe74c3c,
-                        executor: interaction.user
-                    });
-                    return interaction.editReply({ content: 'Błędny kod! Kliknij przycisk "Zweryfikuj" ponownie.' });
+                    try {
+                        if (typeof client.sendLog === 'function') {
+                            await client.sendLog(`⚠️ Użytkownik **${interaction.user.tag}** podał błędny kod weryfikacyjny (\`${userInput}\`, oczekiwano: \`${expectedCode}\`).`);
+                        }
+                    } catch (e) {}
+
+                    return interaction.editReply({ content: '<a:redtick:1543991522192527450> Błędny kod! Kliknij przycisk "Zweryfikuj" ponownie.' });
                 }
 
                 captchaStorage.delete(interaction.user.id);
@@ -124,22 +132,15 @@ module.exports = {
                     }
                     await member.roles.add(ROLA_ZWERYFIKOWANY);
 
-                    await sendLog(interaction.client, {
-                        title: 'Pomyślna Weryfikacja',
-                        description: `Użytkownik pomyślnie ukończył weryfikację i otrzymał odpowiednie role.\n\n• **Użytkownik:** <@${interaction.user.id}> (\`${interaction.user.tag}\`)`,
-                        color: 0x2ecc71,
-                        executor: interaction.user
-                    });
+                    try {
+                        if (typeof client.sendLog === 'function') {
+                            await client.sendLog(`✅ Użytkownik **${interaction.user.tag}** pomyślnie przeszedł weryfikację!`);
+                        }
+                    } catch (e) {}
 
-                    return interaction.editReply({ content: 'Pomyślnie zweryfikowano! Witaj na serwerze.' });
+                    return interaction.editReply({ content: '<a:greentick:1543991524738465853> Pomyślnie zweryfikowano! Witaj na serwerze.' });
                 } catch (error) {
-                    await sendLog(interaction.client, {
-                        title: 'Błąd Ról podczas Weryfikacji',
-                        description: `Nie udało się nadać ról użytkownikowi <@${interaction.user.id}>.`,
-                        color: 0xe74c3c,
-                        executor: interaction.user
-                    });
-                    return interaction.editReply({ content: 'Wystąpił błąd podczas nadawania ról. Powiadom administrację.' });
+                    return interaction.editReply({ content: '<a:redtick:1543991522192527450> Wystąpił błąd podczas nadawania ról. Powiadom administrację.' });
                 }
             }
         });
