@@ -155,7 +155,7 @@ module.exports = {
                         const istniejacyDowod = dowodyDB.get(userId) || await pobierzLubOdzyskajDowod(interaction.guild, userId);
                         const starych = istniejacyDowod ? istniejacyDowod.dane : {};
                         embed.setTitle('Wniosek o edycję dowodu osobistego').setColor(0x3498db)
-                            .setDescription(`**Właściciel:** <@${userId}>\n\n### Dane przed zmianą:\n• **Imię:** ${starych.imie \vert{}\vert{} 'Brak'}\n• **Roblox:** ${starych.roblox || 'Brak'}\n\n### Dane po zmianie (Nowe):\n• **Imię:** ${pelneDane.imie}\n• **Roblox:** ${pelneDane.roblox}`);
+                            .setDescription(`**Właściciel:** <@${userId}>\n\n### Dane przed zmianą:\n• **Imię:** ${starych.imie || 'Brak'}\n• **Roblox:** ${starych.roblox || 'Brak'}\n\n### Dane po zmianie (Nowe):\n• **Imię:** ${pelneDane.imie}\n• **Roblox:** ${pelneDane.roblox}`);
                     } else {
                         embed.setTitle('Nowy wniosek o dowód osobisty').setColor(0x3498db)
                             .setDescription(`**Właściciel:** <@${userId}>\n\n**Imię i Nazwisko:** ${pelneDane.imie}\n**Data urodzenia:** ${pelneDane.data_ur}\n**Nick Roblox:** ${pelneDane.roblox}`);
@@ -228,7 +228,7 @@ module.exports = {
                     const kanalDowodow = await interaction.guild.channels.fetch(KANAL_DOWODOW).catch(() => null);
                     if (!kanalDowodow) return interaction.followUp({ content: 'Nie znaleziono kanału docelowego dowodów.', ephemeral: true });
                     const dane = wniosek.dane;
-                    const tekst = `🪪 DOWÓD OSOBISTY (<@${targetUserId}>) | OBYWATEL POLSKICH DRÓG \n\n**Dane Osobowe**\nImię i Nazwisko: ${dane.imie}\nData urodzenia: ${dane.data_ur}\nMiejsce urodzenia:${dane.miejsce_ur}\nPłeć: (M/K) ${dane.plec}\nNick Roblox:${dane.roblox}\nNick Discord: ${dane.discord}\nAktualna praca:${dane.praca}`;
+                    const tekst = `🪪 DOWÓD OSOBISTY (<@${targetUserId}>) | OBYWATEL POLSKICH DRÓG \n\n**Dane Osobowe**\nImię i Nazwisko: ${dane.imie}\nData urodzenia: ${dane.data_ur}\nMiejsce urodzenia: ${dane.miejsce_ur}\nPłeć: (M/K) ${dane.plec}\nNick Roblox: ${dane.roblox}\nNick Discord: ${dane.discord}\nAktualna praca: ${dane.praca}`;
                     const wyslanaWiadomosc = await kanalDowodow.send(tekst);
                     dowodyDB.set(targetUserId, { wiadomoscId: wyslanaWiadomosc.id, linkWiadomosci: wyslanaWiadomosc.url, dane });
                     wnioskiDB.delete(interaction.message.id);
@@ -251,7 +251,7 @@ module.exports = {
                     const kanalDowodow = await interaction.guild.channels.fetch(KANAL_DOWODOW).catch(() => null);
                     const staryWpis = kanalDowodow ? await kanalDowodow.messages.fetch(istniejacyDowod.wiadomoscId).catch(() => null) : null;
                     const dane = wniosek.dane;
-                    const nowyTekst = `🪪 DOWÓD OSOBISTY (<@${targetUserId}>) | OBYWATEL POLSKICH DRÓG \n\n**Dane Osobowe**\nImię i Nazwisko: ${dane.imie}\nData urodzenia: ${dane.data_ur}\nMiejsce urodzenia:${dane.miejsce_ur}\nPłeć: (M/K) ${dane.plec}\nNick Roblox:${dane.roblox}\nNick Discord: ${dane.discord}\nAktualna praca:${dane.praca}`;
+                    const nowyTekst = `🪪 DOWÓD OSOBISTY (<@${targetUserId}>) | OBYWATEL POLSKICH DRÓG \n\n**Dane Osobowe**\nImię i Nazwisko: ${dane.imie}\nData urodzenia: ${dane.data_ur}\nMiejsce urodzenia: ${dane.miejsce_ur}\nPłeć: (M/K) ${dane.plec}\nNick Roblox: ${dane.roblox}\nNick Discord: ${dane.discord}\nAktualna praca: ${dane.praca}`;
                     if (staryWpis) await staryWpis.edit(nowyTekst);
                     istniejacyDowod.dane = dane;
                     wnioskiDB.delete(interaction.message.id);
