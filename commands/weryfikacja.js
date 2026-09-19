@@ -52,10 +52,10 @@ module.exports = {
 
         await channel.send({ embeds: [embed], components: [row] });
 
-        // Logowanie akcji setupu weryfikacji
+        // Logowanie akcji setupu weryfikacji z nową spójną emotką
         try {
             if (interaction.client && typeof interaction.client.sendLog === 'function') {
-                await interaction.client.sendLog(`🛡️ **${interaction.user.tag}** skonfigurował panel weryfikacji na kanale <#${KANAL_WERYFIKACJI}> (zaktualizowano uprawnienia dla ${updatedChannels} kanałów).`);
+                await interaction.client.sendLog(`<a:neon_staff:1550909470605844650> Użytkownik **${interaction.user.tag}** skonfigurował panel weryfikacji na kanale <#${KANAL_WERYFIKACJI}> (zaktualizowano uprawnienia dla ${updatedChannels} kanałów).`);
             }
         } catch (err) {
             console.error('Błąd logowania weryfikacji setup:', err);
@@ -70,7 +70,7 @@ module.exports = {
             try {
                 await member.roles.add(ROLA_NIEZWERYFIKOWANY).catch(() => {});
                 if (typeof client.sendLog === 'function') {
-                    await client.sendLog(`📥 Nowy użytkownik **${member.user.tag}** dołączył na serwer – nadano rolę niezweryfikowanego.`);
+                    await client.sendLog(`<a:greentick:1543991524738465853> Nowy użytkownik **${member.user.tag}** dołączył na serwer - nadano rolę niezweryfikowanego.`);
                 }
             } catch (error) {}
         });
@@ -116,13 +116,14 @@ module.exports = {
                 if (!expectedCode || userInput !== expectedCode) {
                     try {
                         if (typeof client.sendLog === 'function') {
-                            await client.sendLog(`⚠️ Użytkownik **${interaction.user.tag}** podał błędny kod weryfikacyjny (\`${userInput}\`, oczekiwano: \`${expectedCode}\`).`);
+                            await client.sendLog(`<a:redtick:1543991522192527450> Użytkownik **${interaction.user.tag}** podał błędny kod weryfikacyjny (\`${userInput}\`, oczekiwano: \`${expectedCode}\`).`);
                         }
                     } catch (e) {}
 
                     return interaction.editReply({ content: '<a:redtick:1543991522192527450> Błędny kod! Kliknij przycisk "Zweryfikuj" ponownie.' });
                 }
 
+                captchaStorage.get(interaction.user.id); // lub delete
                 captchaStorage.delete(interaction.user.id);
                 const member = interaction.member;
 
@@ -134,7 +135,7 @@ module.exports = {
 
                     try {
                         if (typeof client.sendLog === 'function') {
-                            await client.sendLog(`✅ Użytkownik **${interaction.user.tag}** pomyślnie przeszedł weryfikację!`);
+                            await client.sendLog(`<a:greentick:1543991524738465853> Użytkownik **${interaction.user.tag}** pomyślnie przeszedł weryfikację!`);
                         }
                     } catch (e) {}
 
