@@ -25,21 +25,26 @@ module.exports = {
             return interaction.editReply('❌ Nie znaleziono kanału weryfikacji o podanym ID!');
         }
 
-        // 1. Zmiana permisji na WSZYSTKICH istniejących kanałach (oprócz weryfikacji)
+        // Pobranie świeżej listy kanałów bezpośrednio z serwera
+        const channels = await guild.channels.fetch();
         let updatedChannels = 0;
-        for (const [chId, chObj] of guild.channels.cache) {
-            if (chId === KANAL_WERYFIKACJI) continue;
+
+        for (const [chId, chObj] of channels) {
+            if (!chObj || chId === KANAL_WERYFIKACJI) continue;
+            // Pomijamy wątki, bo nie mają standardowych uprawnień kanału głównego
+            if (chObj.isThread && chObj.isThread()) continue;
+
             try {
-                await chObj.permissionOverwrites.create(ROLA_NIEZWERYFIKOWANY, {
+                await chObj.permissionOverwrites.edit(ROLA_NIEZWERYFIKOWANY, {
                     ViewChannel: false
                 });
                 updatedChannels++;
             } catch (error) {
-                console.error(`Nie udało się zaktualizować permisji dla kanału ${chObj.name}:`, error);
+                console.error(`Nie udało się zaktualizować permisji dla kanału ${chObj.name}:`, error.message);
             }
         }
 
-        // 2. Wysłanie wiadomości weryfikacyjnej
+        // Wysłanie wiadomości weryfikacyjnej
         const embed = new EmbedBuilder()
             .setColor(0xFFCE00)
             .setDescription(
@@ -57,7 +62,7 @@ module.exports = {
 
         await channel.send({ embeds: [embed], components: [row] });
 
-        return interaction.editReply(`✅ Pomyślnie wysłano panel weryfikacyjny oraz ukryto **${updatedChannels}** istniejących kanałów przed rolą niezweryfikowanych!`);
+        return interaction.editReply(`✅ Pomyślnie wysłano panel weryfikacyjny oraz zaktualizowano uprawnienia dla **${updatedChannels}** kanałów!`);
     },
 
     setupEvents(client) {
@@ -74,9 +79,10 @@ module.exports = {
         client.on('channelCreate', async channel => {
             if (!channel.guild) return;
             if (channel.id === KANAL_WERYFIKACJI) return;
+            if (channel.isThread && channel.isThread()) return;
 
             try {
-                await channel.permissionOverwrites.create(ROLA_NIEZWERYFIKOWANY, {
+                await channel.permissionOverwrites.edit(ROLA_NIEZWERYFIKOWANY, {
                     ViewChannel: false
                 });
             } catch (error) {
