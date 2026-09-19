@@ -63,13 +63,13 @@ module.exports = {
             reklamaEmbed.setThumbnail(logo);
         }
 
-        // Wysłanie logu na kanał (jeśli funkcja sendLog jest dostępna globalnie w kliencie/indeksie lub zaimportowana)
+        // Logowanie użycia komendy reklamy z nową spójną emotką administracyjną
         try {
             if (interaction.client && typeof interaction.client.sendLog === 'function') {
-                await interaction.client.sendLog(`📢 **${interaction.user.tag}** wysłał reklamę serwera: **${nazwa}** na kanale <#${interaction.channelId}>.`);
+                await interaction.client.sendLog(`<a:neon_staff:1550909470605844650> Użytkownik **${interaction.user.tag}** wygenerował reklamę serwera: **${nazwa}** na kanale <#${interaction.channelId}>.`);
             }
         } catch (err) {
-            console.error('Błąd logowania reklamy:', err);
+            console.error('Błąd logowania komendy reklama:', err);
         }
 
         return interaction.reply({ embeds: [reklamaEmbed] });
