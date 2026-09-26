@@ -48,22 +48,36 @@ function setupGlobalLogs(client) {
         await sendLog(client, `<a:redtick:1543991522192527450> Wiadomość bota została **usunięta** na kanale <#${message.channelId}>.`);
     });
 
-    // 7. Dodanie reakcji (np. do tablicy aktywności)
+    // 7. Dodanie reakcji (tylko do wiadomości bota)
     client.on('messageReactionAdd', async (reaction, user) => {
         if (user.bot) return;
         if (reaction.partial) {
             try { await reaction.fetch(); } catch { return; }
         }
-        await sendLog(client, `⭐ Użytkownik **${user.tag}** dodał reakcję \`${reaction.emoji.name}\` na kanale <#${reaction.message.channelId}>.`);
+        if (reaction.message.partial) {
+            try { await reaction.message.fetch(); } catch { return; }
+        }
+
+        // Sprawdzamy czy wiadomość należy do bota
+        if (reaction.message.author?.id !== client.user.id) return;
+
+        await sendLog(client, `⭐ Użytkownik **${user.tag}** dodał reakcję \`${reaction.emoji.name}\` do wiadomości bota na kanale <#${reaction.message.channelId}>.`);
     });
 
-    // 8. Usunięcie reakcji
+    // 8. Usunięcie reakcji (tylko do wiadomości bota)
     client.on('messageReactionRemove', async (reaction, user) => {
         if (user.bot) return;
         if (reaction.partial) {
             try { await reaction.fetch(); } catch { return; }
         }
-        await sendLog(client, `⭐ Użytkownik **${user.tag}** usunął reakcję \`${reaction.emoji.name}\` na kanale <#${reaction.message.channelId}>.`);
+        if (reaction.message.partial) {
+            try { await reaction.message.fetch(); } catch { return; }
+        }
+
+        // Sprawdzamy czy wiadomość należy do bota
+        if (reaction.message.author?.id !== client.user.id) return;
+
+        await sendLog(client, `⭐ Użytkownik **${user.tag}** usunął reakcję \`${reaction.emoji.name}\` z wiadomości bota na kanale <#${reaction.message.channelId}>.`);
     });
 }
 
