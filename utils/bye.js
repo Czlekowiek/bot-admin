@@ -6,7 +6,7 @@ async function sendLeaveMessage(member) {
         const channel = await member.guild.channels.fetch('1542121319263641683').catch(() => null);
         if (!channel) return;
 
-        const attachment = await generateBanner(member, 'https://iili.io/nqeNgnV.png', 'leave');
+        const attachment = await generateBanner(member, 'https://i.imgur.com/WqmPhCX.png', 'leave');
         const formattedDate = member.user.createdAt.toISOString().replace(/T/, ' ').replace(/\..+/, '');
         const displayName = member.displayName;
 
