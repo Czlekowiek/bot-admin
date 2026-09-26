@@ -6,7 +6,7 @@ async function sendWelcomeMessage(member) {
         const channel = await member.guild.channels.fetch('1542121319263641682').catch(() => null);
         if (!channel) return;
 
-        const attachment = await generateBanner(member, 'https://iili.io/nqND2ls.png', 'welcome');
+        const attachment = await generateBanner(member, 'https://i.imgur.com/jYhAJz6.png', 'welcome');
         const formattedDate = member.user.createdAt.toISOString().replace(/T/, ' ').replace(/\..+/, '');
         const displayName = member.displayName;
 
