@@ -6,7 +6,7 @@ const { Client, GatewayIntentBits, Partials, Collection, REST, Routes, EmbedBuil
 const { generateStaffEmbed } = require('./utils/sklad-administracji');
 const { sendWelcomeMessage } = require('./utils/welcome');
 const { sendLeaveMessage } = require('./utils/bye');
-const { setupGlobalLogs, sendLog } = require('./utils/logs'); // <- Nowy system logów
+const { setupGlobalLogs, sendLog } = require('./utils/logs');
 
 // =========================================================
 // HTTP SERVER - RENDER
@@ -35,7 +35,7 @@ const client = new Client({
 
 client.commands = new Collection();
 const commands = [];
-const CHANNEL_IDS = ['1548682257320120380', '1542122713676644352']; // Dopasuj do swoich ID kanałów administracyjnych
+const CHANNEL_IDS = ['1548682257320120380', '1542122713676644352'];
 
 // Uruchomienie globalnych logów
 setupGlobalLogs(client);
@@ -193,30 +193,52 @@ async function updateActivityBoard(message, usersList) {
 client.on('interactionCreate', async interaction => {
     if (!interaction.isModalSubmit()) return;
 
-    if (interaction.customId.startsWith('modal_send_')) {
+    if (interaction.customId === 'modal_send_wiadomosc') {
         await interaction.deferReply({ ephemeral: true });
-
-        const typ = interaction.customId.split('_')[2];
         const tresc = interaction.fields.getTextInputValue('send_content');
         const kanał = interaction.channel;
 
         try {
-            if (typ === 'wiadomosc') {
-                await kanał.send({ content: tresc });
-            } else if (typ === 'embed') {
-                const embed = new EmbedBuilder()
-                    .setColor(0xFFCE00) // Stały kolor #FFCE00
-                    .setDescription(tresc);
-
-                await kanał.send({ embeds: [embed] });
-            }
-
-            await sendLog(client, `<a:neon_staff:1550909470605844650> Użytkownik **${interaction.user.tag}** wysłał oficjalną wiadomość (${typ}) za pomocą komendy \`/send\` na kanale <#${kanał.id}>.`);
-
+            await kanał.send({ content: tresc });
+            await sendLog(client, `<a:neon_staff:1550909470605844650> Użytkownik **${interaction.user.tag}** wysłał wiadomość za pomocą komendy \`/send\` na kanale <#${kanał.id}>.`);
             return interaction.editReply({ content: '<a:greentick:1543991524738465853> Wiadomość została pomyślnie wysłana na tym kanale!' });
         } catch (error) {
             console.error('Błąd podczas wysyłania wiadomości przez /send:', error);
             return interaction.editReply({ content: '<a:redtick:1543991522192527450> Wystąpił błąd podczas wysyłania wiadomości.' });
+        }
+    }
+
+    if (interaction.customId === 'modal_send_embed') {
+        await interaction.deferReply({ ephemeral: true });
+
+        const title = interaction.fields.getTextInputValue('embed_title');
+        const content = interaction.fields.getTextInputValue('embed_content');
+        const customFooter = interaction.fields.getTextInputValue('embed_footer');
+        const thumbnail = interaction.fields.getTextInputValue('embed_thumbnail');
+        const image = interaction.fields.getTextInputValue('embed_image');
+        const kanał = interaction.channel;
+
+        try {
+            const embed = new EmbedBuilder()
+                .setColor(0xFFCE00)
+                .setDescription(content);
+
+            if (title) embed.setTitle(title);
+            if (thumbnail) embed.setThumbnail(thumbnail);
+            if (image) embed.setImage(image);
+
+            let footerText = `Wysłane przez ${interaction.user.tag}`;
+            if (customFooter) {
+                footerText = `${customFooter} • ${footerText}`;
+            }
+            embed.setFooter({ text: footerText, iconURL: interaction.user.displayAvatarURL() });
+
+            await kanał.send({ embeds: [embed] });
+            await sendLog(client, `<a:neon_staff:1550909470605844650> Użytkownik **${interaction.user.tag}** wysłał embed za pomocą komendy \`/send\` na kanale <#${kanał.id}>.`);
+            return interaction.editReply({ content: '<a:greentick:1543991524738465853> Embed został pomyślnie wysłany na tym kanale!' });
+        } catch (error) {
+            console.error('Błąd podczas wysyłania embedu przez /send:', error);
+            return interaction.editReply({ content: '<a:redtick:1543991522192527450> Wystąpił błąd podczas wysyłania embedu.' });
         }
     }
 });
