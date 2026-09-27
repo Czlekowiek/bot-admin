@@ -4,47 +4,53 @@ const path = require('path');
 
 const configPath = path.join(__dirname, '../data/frakcje_config.json');
 
-// Domyślne frakcje zgodnie z wytycznymi
-let FRAKCJE_DATA = {
-    'kgp': {
-        skrot: 'kgp',
-        pelnaNazwa: 'Komenda Główna Policji',
-        nazwaPrzycisku: 'KGP',
-        tekstLinijka: 'Komenda Główna Policji',
-        discord: 'https://discord.gg/twoj-link-kgp',
-        podanie: 'https://forms.gle/twoj-link-podanie-kgp'
+// Domyślna konfiguracja (zawiera też tablicę ID aktywnych paneli)
+let CONFIG = {
+    panele: {
+        gracz: [], // Przechowuje ID wiadomości z publicznym panelem { channelId, messageId }
+        admin: []  // Przechowuje ID wiadomości z panelem administracyjnym { channelId, messageId }
     },
-    'prm': {
-        skrot: 'prm',
-        pelnaNazwa: 'Państwowe Ratownictwo Medyczne',
-        nazwaPrzycisku: 'PRM',
-        tekstLinijka: 'Państwowe Ratownictwo Medyczne',
-        discord: 'https://discord.gg/twoj-link-prm',
-        podanie: 'https://forms.gle/twoj-link-podanie-prm'
-    },
-    'osp': {
-        skrot: 'osp',
-        pelnaNazwa: 'Ochotnicza Straż Pożarna',
-        nazwaPrzycisku: 'OSP',
-        tekstLinijka: 'Ochotnicza Straż Pożarna',
-        discord: 'https://discord.gg/twoj-link-osp',
-        podanie: 'https://forms.gle/twoj-link-podanie-osp'
-    },
-    'itd': {
-        skrot: 'itd',
-        pelnaNazwa: 'Inspekcja Transportu Drogowego',
-        nazwaPrzycisku: 'ITD',
-        tekstLinijka: 'Inspekcja Transportu Drogowego',
-        discord: 'https://discord.gg/twoj-link-itd',
-        podanie: 'https://forms.gle/twoj-link-podanie-itd'
-    },
-    'pr': {
-        skrot: 'pr',
-        pelnaNazwa: 'Prokuratura Rejonowa',
-        nazwaPrzycisku: 'PR',
-        tekstLinijka: 'Prokuratura Rejonowa',
-        discord: 'https://discord.gg/twoj-link-pr',
-        podanie: 'https://forms.gle/twoj-link-podanie-pr'
+    frakcje: {
+        'kgp': {
+            skrot: 'kgp',
+            pelnaNazwa: 'Komenda Główna Policji',
+            nazwaPrzycisku: 'KGP',
+            tekstLinijka: 'Komenda Główna Policji',
+            discord: 'https://discord.gg/twoj-link-kgp',
+            podanie: 'https://forms.gle/twoj-link-podanie-kgp'
+        },
+        'prm': {
+            skrot: 'prm',
+            pelnaNazwa: 'Państwowe Ratownictwo Medyczne',
+            nazwaPrzycisku: 'PRM',
+            tekstLinijka: 'Państwowe Ratownictwo Medyczne',
+            discord: 'https://discord.gg/twoj-link-prm',
+            podanie: 'https://forms.gle/twoj-link-podanie-prm'
+        },
+        'osp': {
+            skrot: 'osp',
+            pelnaNazwa: 'Ochotnicza Straż Pożarna',
+            nazwaPrzycisku: 'OSP',
+            tekstLinijka: 'Ochotnicza Straż Pożarna',
+            discord: 'https://discord.gg/twoj-link-osp',
+            podanie: 'https://forms.gle/twoj-link-podanie-osp'
+        },
+        'itd': {
+            skrot: 'itd',
+            pelnaNazwa: 'Inspekcja Transportu Drogowego',
+            nazwaPrzycisku: 'ITD',
+            tekstLinijka: 'Inspekcja Transportu Drogowego',
+            discord: 'https://discord.gg/twoj-link-itd',
+            podanie: 'https://forms.gle/twoj-link-podanie-itd'
+        },
+        'pr': {
+            skrot: 'pr',
+            pelnaNazwa: 'Prokuratura Rejonowa',
+            nazwaPrzycisku: 'PR',
+            tekstLinijka: 'Prokuratura Rejonowa',
+            discord: 'https://discord.gg/twoj-link-pr',
+            podanie: 'https://forms.gle/twoj-link-podanie-pr'
+        }
     }
 };
 
@@ -53,10 +59,12 @@ function loadConfig() {
         if (fs.existsSync(configPath)) {
             const data = fs.readFileSync(configPath, 'utf8');
             const parsed = JSON.parse(data);
-            if (Object.keys(parsed).length > 0) {
-                FRAKCJE_DATA = { ...FRAKCJE_DATA, ...parsed };
-            } else {
-                saveConfig();
+            
+            // Obsługa kompatybilności wstecznej (jeśli plik nie miał jeszcze struktury "panele")
+            if (parsed.frakcje) {
+                CONFIG = { ...CONFIG, ...parsed };
+            } else if (Object.keys(parsed).length > 0) {
+                CONFIG.frakcje = { ...CONFIG.frakcje, ...parsed };
             }
         } else {
             saveConfig();
@@ -70,7 +78,7 @@ function saveConfig() {
     try {
         const dir = path.dirname(configPath);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(configPath, JSON.stringify(FRAKCJE_DATA, null, 2), 'utf8');
+        fs.writeFileSync(configPath, JSON.stringify(CONFIG, null, 2), 'utf8');
     } catch (e) {
         console.error('Błąd zapisu konfiguracji frakcji:', e);
     }
@@ -78,7 +86,7 @@ function saveConfig() {
 
 loadConfig();
 
-// Funkcja budująca dynamiczny embed i przyciski panelu gracza
+// Funkcja budująca publiczny panel gracza
 function buildUserPanel() {
     let description = 
         `## <:googleform:1553818167753572362> PANEL PODAŃ DO FRAKCJI\n` +
@@ -86,7 +94,7 @@ function buildUserPanel() {
 
     const buttons = [];
 
-    for (const [key, data] of Object.entries(FRAKCJE_DATA)) {
+    for (const [key, data] of Object.entries(CONFIG.frakcje)) {
         description += `\n### <a:dot:1543969325155745812> ${data.tekstLinijka}\n<:arrow:1543977081233342494> Kliknij przycisk ${data.nazwaPrzycisku}, aby otrzymać linki.`;
         
         buttons.push(
@@ -101,14 +109,91 @@ function buildUserPanel() {
         .setColor(0xFFCE00)
         .setDescription(description);
 
-    // Dzielenie przycisków na rzędy (maksymalnie 5 w rzędzie)
     const rows = [];
     for (let i = 0; i < buttons.length; i += 5) {
-        const chunk = buttons.slice(i, i + 5);
-        rows.push(new ActionRowBuilder().addComponents(chunk));
+        rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + 5)));
     }
 
     return { embeds: [embed], components: rows };
+}
+
+// Funkcja budująca panel administracyjny
+function buildAdminPanel() {
+    const adminEmbed = new EmbedBuilder()
+        .setColor(0xFF0000)
+        .setTitle('🛠️ · PANEL ZARZĄDZANIA FRAKCJAMI')
+        .setDescription(
+            `Witaj w panelu administracyjnym.\n\n` +
+            `> Kliknij przycisk wybranej frakcji poniżej, aby edytować jej linki, lub użyj przycisków na samym dole, aby **dodać** lub **usunąć** frakcję z listy.`
+        );
+
+    const buttons = [];
+    for (const [key, data] of Object.entries(CONFIG.frakcje)) {
+        buttons.push(
+            new ButtonBuilder()
+                .setCustomId(`admin_edit_${key}`)
+                .setLabel(`Edytuj ${data.nazwaPrzycisku}`)
+                .setStyle(ButtonStyle.Secondary)
+        );
+    }
+
+    const rows = [];
+    for (let i = 0; i < buttons.length; i += 5) {
+        rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + 5)));
+    }
+
+    const controlRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('admin_add_faction').setLabel('➕ Dodaj frakcję').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('admin_remove_faction').setLabel('➖ Usuń frakcję').setStyle(ButtonStyle.Danger)
+    );
+    rows.push(controlRow);
+
+    return { embeds: [adminEmbed], components: rows };
+}
+
+// Funkcja automatycznie aktualizująca wszystkie wysłane aktywne panele na serwerze
+async function updateAllPanels(client) {
+    // 1. Aktualizacja paneli graczy
+    for (let i = CONFIG.panele.gracz.length - 1; i >= 0; i--) {
+        const p = CONFIG.panele.gracz[i];
+        try {
+            const channel = await client.channels.fetch(p.channelId).catch(() => null);
+            if (!channel) {
+                CONFIG.panele.gracz.splice(i, 1);
+                continue;
+            }
+            const msg = await channel.messages.fetch(p.messageId).catch(() => null);
+            if (!msg) {
+                CONFIG.panele.gracz.splice(i, 1);
+                continue;
+            }
+            await msg.edit(buildUserPanel());
+        } catch (e) {
+            console.error('Błąd aktualizacji panelu gracza:', e);
+        }
+    }
+
+    // 2. Aktualizacja paneli administracyjnych
+    for (let i = CONFIG.panele.admin.length - 1; i >= 0; i--) {
+        const p = CONFIG.panele.admin[i];
+        try {
+            const channel = await client.channels.fetch(p.channelId).catch(() => null);
+            if (!channel) {
+                CONFIG.panele.admin.splice(i, 1);
+                continue;
+            }
+            const msg = await channel.messages.fetch(p.messageId).catch(() => null);
+            if (!msg) {
+                CONFIG.panele.admin.splice(i, 1);
+                continue;
+            }
+            await msg.edit(buildAdminPanel());
+        } catch (e) {
+            console.error('Błąd aktualizacji panelu admina:', e);
+        }
+    }
+
+    saveConfig();
 }
 
 module.exports = {
@@ -132,55 +217,33 @@ module.exports = {
 
         if (subcommand === 'wyslij-panel') {
             await interaction.deferReply({ ephemeral: true });
-            const panel = buildUserPanel();
-            await interaction.channel.send(panel);
-            return interaction.editReply({ content: '✅ Pomyślnie wysłano publiczny panel podań na ten kanał!' });
+            const msg = await interaction.channel.send(buildUserPanel());
+            
+            // Zapisujemy panel do listy aktywnych
+            CONFIG.panele.gracz.push({ channelId: interaction.channelId, messageId: msg.id });
+            saveConfig();
+
+            return interaction.editReply({ content: '✅ Pomyślnie wysłano publiczny panel podań na ten kanał! Będzie się on automatycznie aktualizował.' });
         }
 
         if (subcommand === 'wyslij-panel-zarzadzanie') {
             await interaction.deferReply({ ephemeral: true });
+            const msg = await interaction.channel.send(buildAdminPanel());
+            
+            // Zapisujemy panel admina do listy aktywnych
+            CONFIG.panele.admin.push({ channelId: interaction.channelId, messageId: msg.id });
+            saveConfig();
 
-            const adminEmbed = new EmbedBuilder()
-                .setColor(0xFF0000)
-                .setTitle('🛠️ · PANEL ZARZĄDZANIA FRAKCJAMI')
-                .setDescription(
-                    `Witaj w panelu administracyjnym.\n\n` +
-                    `> Kliknij przycisk wybranej frakcji poniżej, aby edytować jej linki, lub użyj przycisków na samym dole, aby **dodać** lub **usunąć** frakcję z listy.`
-                );
-
-            const buttons = [];
-            for (const [key, data] of Object.entries(FRAKCJE_DATA)) {
-                buttons.push(
-                    new ButtonBuilder()
-                        .setCustomId(`admin_edit_${key}`)
-                        .setLabel(`Edytuj ${data.nazwaPrzycisku}`)
-                        .setStyle(ButtonStyle.Secondary)
-                );
-            }
-
-            const rows = [];
-            for (let i = 0; i < buttons.length; i += 5) {
-                rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + 5)));
-            }
-
-            // Rząd z przyciskami Dodaj / Usuń frakcję (inne kolory)
-            const controlRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('admin_add_faction').setLabel('➕ Dodaj frakcję').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId('admin_remove_faction').setLabel('➖ Usuń frakcję').setStyle(ButtonStyle.Danger)
-            );
-            rows.push(controlRow);
-
-            await interaction.channel.send({ embeds: [adminEmbed], components: rows });
-            return interaction.editReply({ content: '✅ Pomyślnie wysłano panel zarządzania na ten kanał!' });
+            return interaction.editReply({ content: '✅ Pomyślnie wysłano panel zarządzania na ten kanał! Będzie się on automatycznie aktualizował.' });
         }
     },
 
     setupEvents(client) {
         client.on('interactionCreate', async interaction => {
-            // 1. Kliknięcie przez gracza (wysyłanie widocznych tylko dla niego linków na kanale)
+            // 1. Kliknięcie przez gracza
             if (interaction.isButton() && interaction.customId.startsWith('podanie_')) {
                 const frakcjaKey = interaction.customId.replace('podanie_', '');
-                const dane = FRAKCJE_DATA[frakcjaKey];
+                const dane = CONFIG.frakcje[frakcjaKey];
 
                 if (!dane) {
                     return interaction.reply({ content: '❌ Ta frakcja nie istnieje lub została usunięta.', ephemeral: true });
@@ -202,7 +265,7 @@ module.exports = {
                 }
 
                 const frakcjaKey = interaction.customId.replace('admin_edit_', '');
-                const dane = FRAKCJE_DATA[frakcjaKey];
+                const dane = CONFIG.frakcje[frakcjaKey];
 
                 const modal = new ModalBuilder()
                     .setCustomId(`modal_edit_${frakcjaKey}`)
@@ -264,12 +327,13 @@ module.exports = {
             if (interaction.isModalSubmit()) {
                 if (interaction.customId.startsWith('modal_edit_')) {
                     const key = interaction.customId.replace('modal_edit_', '');
-                    if (FRAKCJE_DATA[key]) {
-                        FRAKCJE_DATA[key].discord = interaction.fields.getTextInputValue('edit_discord');
-                        FRAKCJE_DATA[key].podanie = interaction.fields.getTextInputValue('edit_podanie');
+                    if (CONFIG.frakcje[key]) {
+                        CONFIG.frakcje[key].discord = interaction.fields.getTextInputValue('edit_discord');
+                        CONFIG.frakcje[key].podanie = interaction.fields.getTextInputValue('edit_podanie');
                         saveConfig();
+                        await updateAllPanels(client); // Automatyczna aktualizacja po edycji
                     }
-                    return interaction.reply({ content: '✅ Zaktualizowano linki!', ephemeral: true });
+                    return interaction.reply({ content: '✅ Zaktualizowano linki i odświeżono aktywne panele!', ephemeral: true });
                 }
 
                 if (interaction.customId === 'modal_add_faction') {
@@ -279,7 +343,7 @@ module.exports = {
                     const discord = interaction.fields.getTextInputValue('add_discord').trim();
                     const podanie = interaction.fields.getTextInputValue('add_podanie').trim();
 
-                    FRAKCJE_DATA[skrot] = {
+                    CONFIG.frakcje[skrot] = {
                         skrot: skrot,
                         pelnaNazwa: pelna,
                         nazwaPrzycisku: przycisk,
@@ -288,17 +352,20 @@ module.exports = {
                         podanie: podanie
                     };
                     saveConfig();
+                    await updateAllPanels(client); // Automatyczna aktualizacja po dodaniu
 
-                    return interaction.reply({ content: `✅ Pomyślnie dodano frakcję **${przycisk}**!`, ephemeral: true });
+                    return interaction.reply({ content: `✅ Pomyślnie dodano frakcję **${przycisk}** i zaktualizowano panele!`, ephemeral: true });
                 }
 
                 if (interaction.customId === 'modal_remove_faction') {
                     const skrot = interaction.fields.getTextInputValue('remove_skrot').toLowerCase().trim();
 
-                    if (FRAKCJE_DATA[skrot]) {
-                        delete FRAKCJE_DATA[skrot];
+                    if (CONFIG.frakcje[skrot]) {
+                        delete CONFIG.frakcje[skrot];
                         saveConfig();
-                        return interaction.reply({ content: `✅ Pomyślnie usunięto frakcję o skrócie **${skrot}**!`, ephemeral: true });
+                        await updateAllPanels(client); // Automatyczna aktualizacja po usunięciu
+
+                        return interaction.reply({ content: `✅ Pomyślnie usunięto frakcję o skrócie **${skrot}** i zaktualizowano panele!`, ephemeral: true });
                     } else {
                         return interaction.reply({ content: `❌ Nie znaleziono frakcji o takim skrócie!`, ephemeral: true });
                     }
