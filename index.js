@@ -2,11 +2,40 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const { Client, GatewayIntentBits, Partials, Collection, REST, Routes, EmbedBuilder } = require('discord.js');
+const { MongoClient, ServerApiVersion } = require('mongodb');
 
 const { generateStaffEmbed } = require('./utils/sklad-administracji');
 const { sendWelcomeMessage } = require('./utils/welcome');
 const { sendLeaveMessage } = require('./utils/bye');
-const { setupGlobalLogs, sendLog } = require('./utils/logs');
+
+// =========================================================
+// MONGODB CONNECTION
+// =========================================================
+
+const uri = process.env.MONGO_URI;
+let db = null;
+
+if (uri) {
+    const mongoClient = new MongoClient(uri, {
+        serverApi: {
+            version: ServerApiVersion.v1,
+            strict: true,
+            deprecationErrors: true,
+        }
+    });
+
+    mongoClient.connect().then(() => {
+        db = mongoClient.db('bot_database'); // Możesz zmienić nazwę bazy danych, jeśli wolisz inną
+        console.log('Połączono pomyślnie z bazą danych MongoDB!');
+    }).catch(err => {
+        console.error('Błąd podczas łączenia z MongoDB:', err);
+    });
+} else {
+    console.warn('Brak zmiennej środowiskowej MONGO_URI! Baza danych nie została zainicjalizowana.');
+}
+
+// Eksport bazy danych do użycia w komendach (np. module.exports.db lub przez client)
+module.exports = { client: null, getDb: () => db };
 
 // =========================================================
 // HTTP SERVER - RENDER
@@ -33,30 +62,57 @@ const client = new Client({
     partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
 
+// Przypisanie klienta do eksportu, aby inne pliki mogły z niego korzystać
+module.exports.client = client;
+
 client.commands = new Collection();
 const commands = [];
-const CHANNEL_IDS = ['1548682257320120380', '1542122713676644352'];
+const CHANNEL_IDS = ['1548638166389366834', '1542122713676644352'];
+const LOG_CHANNEL_ID = '1548682257320120380';
 
-// Uruchomienie globalnych logów
-setupGlobalLogs(client);
+async function sendLog(content) {
+    try {
+        const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+        if (channel) await channel.send({ content });
+    } catch (error) {
+        console.error('Błąd podczas wysyłania logu:', error);
+    }
+}
 
 // =========================================================
 // ŁADOWANIE KOMEND I EVENTÓW MODUŁOWYCH
 // =========================================================
 
+const versionsFilePath = path.join(__dirname, 'command-versions.json');
+let savedVersions = fs.existsSync(versionsFilePath) ? JSON.parse(fs.readFileSync(versionsFilePath, 'utf8')) : {};
+
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.existsSync(commandsPath) ? fs.readdirSync(commandsPath).filter(file => file.endsWith('.js')) : [];
+const currentVersions = {};
+const modifiedCommands = [];
 
 for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
+    const stats = fs.statSync(filePath);
+    currentVersions[file] = stats.mtimeMs;
+
+    if (savedVersions[file] !== undefined && savedVersions[file] !== stats.mtimeMs) {
+        modifiedCommands.push(file.replace('.js', ''));
+    }
+
     const command = require(filePath);
     if ('data' in command && 'execute' in command) {
         client.commands.set(command.data.name, command);
         commands.push(command.data.toJSON());
     }
+    // Automatyczne podpinanie eventów z modułów (weryfikacja, dowod, aktywnosc)
     if (typeof command.setupEvents === 'function') {
         command.setupEvents(client);
     }
+}
+
+if (commandFiles.length > 0) {
+    fs.writeFileSync(versionsFilePath, JSON.stringify(currentVersions, null, 2));
 }
 
 // =========================================================
@@ -88,6 +144,12 @@ async function updateAdminMessage(guild) {
 
 client.once('ready', async () => {
     console.log(`Zalogowano jako ${client.user.tag}!`);
+    setTimeout(async () => {
+        await sendLog(`Bot został uruchomiony. Zalogowano jako \`${client.user.tag}\`.`);
+        if (modifiedCommands.length > 0) {
+            await sendLog(`Wykryto zmianę kodu w komendach: ${modifiedCommands.map(c => `\`/${c}\``).join(', ')}`);
+        }
+    }, 2000);
 
     const guild = client.guilds.cache.first();
     if (guild) {
@@ -96,6 +158,7 @@ client.once('ready', async () => {
             await rest.put(Routes.applicationGuildCommands(client.user.id, guild.id), { body: commands });
         } catch (error) {
             console.error(error);
+            await sendLog(`❌ **Błąd podczas rejestrowania komend:** \`${error.message}\``);
         }
         await updateAdminMessage(guild);
     }
@@ -118,7 +181,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 });
 
 // =========================================================
-// TABLICA AKTYWNOŚCI (REAKCJE)
+// HISTORIA REAKCJI I TABLICA AKTYWNOŚCI
 // =========================================================
 
 const reactionHistory = new Map();
@@ -129,7 +192,9 @@ async function getOrCreateUsersList(reaction) {
         const usersMap = await reaction.users.fetch({ limit: 100 });
         const usersList = [];
         for (const [userId, user] of usersMap) {
-            if (!user.bot) usersList.push(userId);
+            if (!user.bot) {
+                usersList.push(userId);
+            }
         }
         reactionHistory.set(msgId, usersList);
     }
@@ -138,24 +203,36 @@ async function getOrCreateUsersList(reaction) {
 
 client.on('messageReactionAdd', async (reaction, user) => {
     if (user.bot) return;
-    if (reaction.partial) { try { await reaction.fetch(); } catch { return; } }
-    if (reaction.message.partial) { try { await reaction.message.fetch(); } catch { return; } }
+    if (reaction.partial) {
+        try { await reaction.fetch(); } catch { return; }
+    }
+    if (reaction.message.partial) {
+        try { await reaction.message.fetch(); } catch { return; }
+    }
     if (reaction.emoji.id !== '1543969158646206475') return;
 
     const usersList = await getOrCreateUsersList(reaction);
-    if (!usersList.includes(user.id)) usersList.push(user.id);
+    if (!usersList.includes(user.id)) {
+        usersList.push(user.id);
+    }
     await updateActivityBoard(reaction.message, usersList);
 });
 
 client.on('messageReactionRemove', async (reaction, user) => {
     if (user.bot) return;
-    if (reaction.partial) { try { await reaction.fetch(); } catch { return; } }
-    if (reaction.message.partial) { try { await reaction.message.fetch(); } catch { return; } }
+    if (reaction.partial) {
+        try { await reaction.fetch(); } catch { return; }
+    }
+    if (reaction.message.partial) {
+        try { await reaction.message.fetch(); } catch { return; }
+    }
     if (reaction.emoji.id !== '1543969158646206475') return;
 
     const usersList = await getOrCreateUsersList(reaction);
     const index = usersList.indexOf(user.id);
-    if (index > -1) usersList.splice(index, 1);
+    if (index > -1) {
+        usersList.splice(index, 1);
+    }
     await updateActivityBoard(reaction.message, usersList);
 });
 
@@ -183,65 +260,9 @@ async function updateActivityBoard(message, usersList) {
     }
 
     const updatedEmbed = EmbedBuilder.from(embed).setDescription(newDescription);
+
     await message.edit({ embeds: [updatedEmbed] });
 }
-
-// =========================================================
-// OBSŁUGA MODALA KOMENDY /SEND
-// =========================================================
-
-client.on('interactionCreate', async interaction => {
-    if (!interaction.isModalSubmit()) return;
-
-    if (interaction.customId === 'modal_send_wiadomosc') {
-        await interaction.deferReply({ ephemeral: true });
-        const tresc = interaction.fields.getTextInputValue('send_content');
-        const kanał = interaction.channel;
-
-        try {
-            await kanał.send({ content: tresc });
-            await sendLog(client, `<a:neon_staff:1550909470605844650> Użytkownik **${interaction.user.tag}** wysłał wiadomość za pomocą komendy \`/send\` na kanale <#${kanał.id}>.`);
-            return interaction.editReply({ content: '<a:greentick:1543991524738465853> Wiadomość została pomyślnie wysłana na tym kanale!' });
-        } catch (error) {
-            console.error('Błąd podczas wysyłania wiadomości przez /send:', error);
-            return interaction.editReply({ content: '<a:redtick:1543991522192527450> Wystąpił błąd podczas wysyłania wiadomości.' });
-        }
-    }
-
-    if (interaction.customId === 'modal_send_embed') {
-        await interaction.deferReply({ ephemeral: true });
-
-        const title = interaction.fields.getTextInputValue('embed_title');
-        const content = interaction.fields.getTextInputValue('embed_content');
-        const customFooter = interaction.fields.getTextInputValue('embed_footer');
-        const thumbnail = interaction.fields.getTextInputValue('embed_thumbnail');
-        const image = interaction.fields.getTextInputValue('embed_image');
-        const kanał = interaction.channel;
-
-        try {
-            const embed = new EmbedBuilder()
-                .setColor(0xFFCE00)
-                .setDescription(content);
-
-            if (title) embed.setTitle(title);
-            if (thumbnail) embed.setThumbnail(thumbnail);
-            if (image) embed.setImage(image);
-
-            let footerText = `Wysłane przez ${interaction.user.tag}`;
-            if (customFooter) {
-                footerText = `${customFooter} • ${footerText}`;
-            }
-            embed.setFooter({ text: footerText, iconURL: interaction.user.displayAvatarURL() });
-
-            await kanał.send({ embeds: [embed] });
-            await sendLog(client, `<a:neon_staff:1550909470605844650> Użytkownik **${interaction.user.tag}** wysłał embed za pomocą komendy \`/send\` na kanale <#${kanał.id}>.`);
-            return interaction.editReply({ content: '<a:greentick:1543991524738465853> Embed został pomyślnie wysłany na tym kanale!' });
-        } catch (error) {
-            console.error('Błąd podczas wysyłania embedu przez /send:', error);
-            return interaction.editReply({ content: '<a:redtick:1543991522192527450> Wystąpił błąd podczas wysyłania embedu.' });
-        }
-    }
-});
 
 // =========================================================
 // UNIWERSALNA OBSŁUGA KOMEND SLASH
@@ -253,10 +274,12 @@ client.on('interactionCreate', async interaction => {
     const command = client.commands.get(interaction.commandName);
     if (!command || typeof command.execute !== 'function') return;
 
+    await sendLog(`Użytkownik ${interaction.user.tag} użył komendy \`/${interaction.commandName}\` na kanale <#${interaction.channelId}>.`);
     try {
         await command.execute(interaction);
     } catch (error) {
         console.error(error);
+        await sendLog(`❌ **Błąd podczas wykonywania komendy** \`/${interaction.commandName}\` przez ${interaction.user.tag}: \`${error.message}\``);
         const replyOptions = { content: 'Wystąpił błąd podczas wykonywania tej komendy!', ephemeral: true };
         if (interaction.replied || interaction.deferred) await interaction.followUp(replyOptions);
         else await interaction.reply(replyOptions);
@@ -264,7 +287,7 @@ client.on('interactionCreate', async interaction => {
 });
 
 // =========================================================
-// ZAMYKANIE PROCESU
+// ZAMYKANIE PROCESU I LOGOWANIE
 // =========================================================
 
 process.on('SIGINT', () => { process.exit(0); });
