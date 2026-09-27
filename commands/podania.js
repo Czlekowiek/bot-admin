@@ -53,7 +53,11 @@ function loadConfig() {
         if (fs.existsSync(configPath)) {
             const data = fs.readFileSync(configPath, 'utf8');
             const parsed = JSON.parse(data);
-            FRAKCJE_DATA = { ...FRAKCJE_DATA, ...parsed };
+            if (Object.keys(parsed).length > 0) {
+                FRAKCJE_DATA = { ...FRAKCJE_DATA, ...parsed };
+            } else {
+                saveConfig();
+            }
         } else {
             saveConfig();
         }
@@ -78,8 +82,7 @@ loadConfig();
 function buildUserPanel() {
     let description = 
         `## <:googleform:1553818167753572362> PANEL PODAŃ DO FRAKCJI\n` +
-        `## <a:dot:1543969325155745812> Wybierz frakcję, do której chcesz złożyć podanie. Po kliknięciu bot wyśle wiadomość z linkiem do serwera Discord oraz link do podania wybranej frakcji.\n` +
-;
+        `## <a:dot:1543969325155745812> Wybierz frakcję, do której chcesz złożyć podanie. Po kliknięciu bot wyśle wiadomość z linkiem do serwera Discord oraz link do podania wybranej frakcji.`;
 
     const buttons = [];
 
@@ -230,7 +233,7 @@ module.exports = {
                 modal.addComponents(
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('add_skrot').setLabel('Skrót (np. sapd)').setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('add_pelna').setLabel('Pełna nazwa frakcji').setStyle(TextInputStyle.Short).setRequired(true)),
-                    newActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('add_przycisk').setLabel('Nazwa na przycisku (np. SAPD)').setStyle(TextInputStyle.Short).setRequired(true)),
+                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('add_przycisk').setLabel('Nazwa na przycisku (np. SAPD)').setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('add_discord').setLabel('Link Discord').setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('add_podanie').setLabel('Link do podania').setStyle(TextInputStyle.Short).setRequired(true))
                 );
