@@ -6,7 +6,7 @@ const { Client, GatewayIntentBits, Partials, Collection, REST, Routes, EmbedBuil
 const { generateStaffEmbed } = require('./utils/sklad-administracji');
 const { sendWelcomeMessage } = require('./utils/welcome');
 const { sendLeaveMessage } = require('./utils/bye');
-const { setupGlobalLogs } = require('./utils/logs'); // <- Nowy system logów
+const { setupGlobalLogs, sendLog } = require('./utils/logs'); // <- Nowy system logów
 
 // =========================================================
 // HTTP SERVER - RENDER
@@ -185,6 +185,41 @@ async function updateActivityBoard(message, usersList) {
     const updatedEmbed = EmbedBuilder.from(embed).setDescription(newDescription);
     await message.edit({ embeds: [updatedEmbed] });
 }
+
+// =========================================================
+// OBSŁUGA MODALA KOMENDY /SEND
+// =========================================================
+
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isModalSubmit()) return;
+
+    if (interaction.customId.startsWith('modal_send_')) {
+        await interaction.deferReply({ ephemeral: true });
+
+        const typ = interaction.customId.split('_')[2];
+        const tresc = interaction.fields.getTextInputValue('send_content');
+        const kanał = interaction.channel;
+
+        try {
+            if (typ === 'wiadomosc') {
+                await kanał.send({ content: tresc });
+            } else if (typ === 'embed') {
+                const embed = new EmbedBuilder()
+                    .setColor(0xFFCE00) // Stały kolor #FFCE00
+                    .setDescription(tresc);
+
+                await kanał.send({ embeds: [embed] });
+            }
+
+            await sendLog(client, `<a:neon_staff:1550909470605844650> Użytkownik **${interaction.user.tag}** wysłał oficjalną wiadomość (${typ}) za pomocą komendy \`/send\` na kanale <#${kanał.id}>.`);
+
+            return interaction.editReply({ content: '<a:greentick:1543991524738465853> Wiadomość została pomyślnie wysłana na tym kanale!' });
+        } catch (error) {
+            console.error('Błąd podczas wysyłania wiadomości przez /send:', error);
+            return interaction.editReply({ content: '<a:redtick:1543991522192527450> Wystąpił błąd podczas wysyłania wiadomości.' });
+        }
+    }
+});
 
 // =========================================================
 // UNIWERSALNA OBSŁUGA KOMEND SLASH
