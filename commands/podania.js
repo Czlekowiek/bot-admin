@@ -78,8 +78,8 @@ loadConfig();
 function buildUserPanel() {
     let description = 
         `## <:googleform:1553818167753572362> PANEL PODAŃ DO FRAKCJI\n` +
-        `<a:dot:1543969325155745812> Wybierz frakcję, do której chcesz złożyć podanie. Po kliknięciu bot wyśle wiadomość z linkiem do serwera Discord oraz link do podania wybranej frakcji.\n` +
-        `## ᲼`;
+        `## <a:dot:1543969325155745812> Wybierz frakcję, do której chcesz złożyć podanie. Po kliknięciu bot wyśle wiadomość z linkiem do serwera Discord oraz link do podania wybranej frakcji.\n` +
+;
 
     const buttons = [];
 
