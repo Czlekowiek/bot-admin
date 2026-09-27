@@ -60,7 +60,6 @@ function loadConfig() {
             const data = fs.readFileSync(configPath, 'utf8');
             const parsed = JSON.parse(data);
             
-            // Obsługa kompatybilności wstecznej (jeśli plik nie miał jeszcze struktury "panele")
             if (parsed.frakcje) {
                 CONFIG = { ...CONFIG, ...parsed };
             } else if (Object.keys(parsed).length > 0) {
@@ -153,40 +152,26 @@ function buildAdminPanel() {
 
 // Funkcja automatycznie aktualizująca wszystkie wysłane aktywne panele na serwerze
 async function updateAllPanels(client) {
-    // 1. Aktualizacja paneli graczy
     for (let i = CONFIG.panele.gracz.length - 1; i >= 0; i--) {
         const p = CONFIG.panele.gracz[i];
         try {
             const channel = await client.channels.fetch(p.channelId).catch(() => null);
-            if (!channel) {
-                CONFIG.panele.gracz.splice(i, 1);
-                continue;
-            }
+            if (!channel) { CONFIG.panele.gracz.splice(i, 1); continue; }
             const msg = await channel.messages.fetch(p.messageId).catch(() => null);
-            if (!msg) {
-                CONFIG.panele.gracz.splice(i, 1);
-                continue;
-            }
+            if (!msg) { CONFIG.panele.gracz.splice(i, 1); continue; }
             await msg.edit(buildUserPanel());
         } catch (e) {
             console.error('Błąd aktualizacji panelu gracza:', e);
         }
     }
 
-    // 2. Aktualizacja paneli administracyjnych
     for (let i = CONFIG.panele.admin.length - 1; i >= 0; i--) {
         const p = CONFIG.panele.admin[i];
         try {
             const channel = await client.channels.fetch(p.channelId).catch(() => null);
-            if (!channel) {
-                CONFIG.panele.admin.splice(i, 1);
-                continue;
-            }
+            if (!channel) { CONFIG.panele.admin.splice(i, 1); continue; }
             const msg = await channel.messages.fetch(p.messageId).catch(() => null);
-            if (!msg) {
-                CONFIG.panele.admin.splice(i, 1);
-                continue;
-            }
+            if (!msg) { CONFIG.panele.admin.splice(i, 1); continue; }
             await msg.edit(buildAdminPanel());
         } catch (e) {
             console.error('Błąd aktualizacji panelu admina:', e);
@@ -210,6 +195,11 @@ module.exports = {
                 .setName('wyslij-panel-zarzadzanie')
                 .setDescription('Wysyła panel zarządzania linkami i frakcjami dla administracji')
         )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('lista')
+                .setDescription('Wyświetla listę wszystkich skonfigurowanych frakcji wraz z linkami i szczegółami')
+        )
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction) {
@@ -219,7 +209,6 @@ module.exports = {
             await interaction.deferReply({ ephemeral: true });
             const msg = await interaction.channel.send(buildUserPanel());
             
-            // Zapisujemy panel do listy aktywnych
             CONFIG.panele.gracz.push({ channelId: interaction.channelId, messageId: msg.id });
             saveConfig();
 
@@ -230,17 +219,42 @@ module.exports = {
             await interaction.deferReply({ ephemeral: true });
             const msg = await interaction.channel.send(buildAdminPanel());
             
-            // Zapisujemy panel admina do listy aktywnych
             CONFIG.panele.admin.push({ channelId: interaction.channelId, messageId: msg.id });
             saveConfig();
 
             return interaction.editReply({ content: '✅ Pomyślnie wysłano panel zarządzania na ten kanał! Będzie się on automatycznie aktualizował.' });
         }
+
+        if (subcommand === 'lista') {
+            await interaction.deferReply({ ephemeral: true });
+
+            const frakcjeEntries = Object.entries(CONFIG.frakcje);
+
+            if (frakcjeEntries.length === 0) {
+                return interaction.editReply({ content: '❌ Brak skonfigurowanych frakcji w bazie.' });
+            }
+
+            const embed = new EmbedBuilder()
+                .setColor(0x00AEFF)
+                .setTitle('📋 · LISTA SKONFIGUROWANYCH FRAKCJI')
+                .setDescription(`Poniżej znajduje się zestawienie wszystkich aktualnych frakcji w systemie:`);
+
+            for (const [key, data] of frakcjeEntries) {
+                embed.addFields({
+                    name: `🔹 ${data.pelnaNazwa} (${data.nazwaPrzycisku})`,
+                    value: `> **Skrót (klucz):** \`${data.skrot}\`\n` +
+                           `> **Discord:** [Kliknij tutaj](${data.discord})\n` +
+                           `> **Podanie:** [Kliknij tutaj](${data.podanie})`,
+                    inline: false
+                });
+            }
+
+            return interaction.editReply({ embeds: [embed] });
+        }
     },
 
     setupEvents(client) {
         client.on('interactionCreate', async interaction => {
-            // 1. Kliknięcie przez gracza
             if (interaction.isButton() && interaction.customId.startsWith('podanie_')) {
                 const frakcjaKey = interaction.customId.replace('podanie_', '');
                 const dane = CONFIG.frakcje[frakcjaKey];
@@ -258,7 +272,6 @@ module.exports = {
                 return interaction.reply({ content: wiadomosc, ephemeral: true });
             }
 
-            // 2. Kliknięcie edycji frakcji przez administratora
             if (interaction.isButton() && interaction.customId.startsWith('admin_edit_')) {
                 if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
                     return interaction.reply({ content: '❌ Brak uprawnień!', ephemeral: true });
@@ -283,7 +296,6 @@ module.exports = {
                 return await interaction.showModal(modal);
             }
 
-            // 3. Kliknięcie "Dodaj frakcję"
             if (interaction.isButton() && interaction.customId === 'admin_add_faction') {
                 if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
                     return interaction.reply({ content: '❌ Brak uprawnień!', ephemeral: true });
@@ -304,7 +316,6 @@ module.exports = {
                 return await interaction.showModal(modal);
             }
 
-            // 4. Kliknięcie "Usuń frakcję"
             if (interaction.isButton() && interaction.customId === 'admin_remove_faction') {
                 if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
                     return interaction.reply({ content: '❌ Brak uprawnień!', ephemeral: true });
@@ -323,7 +334,6 @@ module.exports = {
                 return await interaction.showModal(modal);
             }
 
-            // 5. Obsługa przesłania modali przez administrację
             if (interaction.isModalSubmit()) {
                 if (interaction.customId.startsWith('modal_edit_')) {
                     const key = interaction.customId.replace('modal_edit_', '');
@@ -331,7 +341,7 @@ module.exports = {
                         CONFIG.frakcje[key].discord = interaction.fields.getTextInputValue('edit_discord');
                         CONFIG.frakcje[key].podanie = interaction.fields.getTextInputValue('edit_podanie');
                         saveConfig();
-                        await updateAllPanels(client); // Automatyczna aktualizacja po edycji
+                        await updateAllPanels(client);
                     }
                     return interaction.reply({ content: '✅ Zaktualizowano linki i odświeżono aktywne panele!', ephemeral: true });
                 }
@@ -352,7 +362,7 @@ module.exports = {
                         podanie: podanie
                     };
                     saveConfig();
-                    await updateAllPanels(client); // Automatyczna aktualizacja po dodaniu
+                    await updateAllPanels(client);
 
                     return interaction.reply({ content: `✅ Pomyślnie dodano frakcję **${przycisk}** i zaktualizowano panele!`, ephemeral: true });
                 }
@@ -363,7 +373,7 @@ module.exports = {
                     if (CONFIG.frakcje[skrot]) {
                         delete CONFIG.frakcje[skrot];
                         saveConfig();
-                        await updateAllPanels(client); // Automatyczna aktualizacja po usunięciu
+                        await updateAllPanels(client);
 
                         return interaction.reply({ content: `✅ Pomyślnie usunięto frakcję o skrócie **${skrot}** i zaktualizowano panele!`, ephemeral: true });
                     } else {
