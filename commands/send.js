@@ -4,10 +4,8 @@ const {
     ModalBuilder, 
     TextInputBuilder, 
     TextInputStyle, 
-    ActionRowBuilder, 
-    EmbedBuilder 
+    ActionRowBuilder 
 } = require('discord.js');
-const { sendLog } = require('../utils/logs');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -18,10 +16,10 @@ module.exports = {
                 .setDescription('Wybierz co chcesz wysłać')
                 .setRequired(true)
                 .addChoices(
-                    { name: 'Zwykła wiadomość', value: 'wiadomosc' },
-                    { name: 'Embed (#FFCE00)', value: 'embed' }
+                    { name: 'Wiadomość', value: 'wiadomosc' },
+                    { name: 'Embed', value: 'embed' }
                 ))
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator), // Domyślnie tylko dla administracji
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction) {
         const typ = interaction.options.getString('typ');
@@ -30,13 +28,56 @@ module.exports = {
             .setCustomId(`modal_send_${typ}`)
             .setTitle(typ === 'wiadomosc' ? 'Wysyłanie wiadomości' : 'Wysyłanie Embedu');
 
-        const textInput = new TextInputBuilder()
-            .setCustomId('send_content')
-            .setLabel(typ === 'wiadomosc' ? 'Treść wiadomości' : 'Treść (opis) embedu')
-            .setStyle(TextInputStyle.Paragraph)
-            .setRequired(true);
-
-        modal.addComponents(new ActionRowBuilder().addComponents(textInput));
+        if (typ === 'wiadomosc') {
+            modal.addComponents(
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId('send_content')
+                        .setLabel('Treść wiadomości')
+                        .setStyle(TextInputStyle.Paragraph)
+                        .setRequired(true)
+                )
+            );
+        } else {
+            // Modal dla Embedu: tylko treść (wiadomość) jest obowiązkowa, reszta opcjonalna
+            modal.addComponents(
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId('embed_title')
+                        .setLabel('Tytuł (opcjonalnie)')
+                        .setStyle(TextInputStyle.Short)
+                        .setRequired(false)
+                ),
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId('embed_content')
+                        .setLabel('Wiadomość / Opis (obowiązkowe)')
+                        .setStyle(TextInputStyle.Paragraph)
+                        .setRequired(true)
+                ),
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId('embed_footer')
+                        .setLabel('Footer (opcjonalnie - dopisze się autor)')
+                        .setStyle(TextInputStyle.Short)
+                        .setRequired(false)
+                ),
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId('embed_thumbnail')
+                        .setLabel('Thumbnail URL (opcjonalnie)')
+                        .setStyle(TextInputStyle.Short)
+                        .setRequired(false)
+                ),
+                new ActionRowBuilder().addComponents(
+                    new TextInputBuilder()
+                        .setCustomId('embed_image')
+                        .setLabel('Image URL (opcjonalnie)')
+                        .setStyle(TextInputStyle.Short)
+                        .setRequired(false)
+                )
+            );
+        }
 
         return await interaction.showModal(modal);
     },
