@@ -1,5 +1,8 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 
+const TOP1_ROLE_ID = '1554904742335881377';
+const EMOJI_ID = '1543969158646206475';
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('aktywnosc')
@@ -13,8 +16,20 @@ module.exports = {
     async execute(interaction) {
         const opis = interaction.options.getString('opis');
         const channelId = '1542122742768210000';
+        const guild = interaction.guild;
 
-        const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
+        // 1. Podczas użycia komendy: sprawdza czy ktoś ma tę rolę i ją zabiera
+        try {
+            await guild.members.fetch(); // Pobiera członków do pamięci cache
+            const membersWithRole = guild.members.cache.filter(member => member.roles.cache.has(TOP1_ROLE_ID));
+            for (const [memberId, member] of membersWithRole) {
+                await member.roles.remove(TOP1_ROLE_ID).catch(() => {});
+            }
+        } catch (err) {
+            console.error('Błąd podczas usuwania starej roli:', err);
+        }
+
+        const channel = await guild.channels.fetch(channelId).catch(() => null);
         if (!channel) {
             return interaction.reply({ content: '<a:redtick:1543991522192527450> Nie znaleziono kanału aktywności', ephemeral: true });
         }
@@ -46,7 +61,7 @@ module.exports = {
             embeds: [embed]
         });
 
-        await sentMessage.react('1543969158646206475');
+        await sentMessage.react(EMOJI_ID);
 
         // Logowanie użycia komendy aktywności
         try {
@@ -56,5 +71,52 @@ module.exports = {
         } catch (e) {}
 
         return interaction.reply({ content: '<a:greentick:1543991524738465853> Utworzono wiadomość aktywności na kanale https://discord.com/channels/1542121318286233683/1542122742768210000', ephemeral: true });
+    },
+
+    // 2. Obsługa reakcji – pierwsza osoba, która zareaguje, dostaje rolę
+    setupEvents(client) {
+        client.on('messageReactionAdd', async (reaction, user) => {
+            if (user.bot) return;
+            if (reaction.partial) {
+                try { await reaction.fetch(); } catch { return; }
+            }
+            if (reaction.message.partial) {
+                try { await reaction.message.fetch(); } catch { return; }
+            }
+
+            if (reaction.emoji.id !== EMOJI_ID) return;
+            if (!reaction.message.embeds.length) return;
+            const embedDesc = reaction.message.embeds[0].description || '';
+            if (!embedDesc.includes('Aktywność check')) return;
+
+            const guild = reaction.message.guild;
+            if (!guild) return;
+
+            // Pobieramy użytkowników, którzy zareagowali na tę wiadomość
+            const usersMap = await reaction.users.fetch({ limit: 10 }).catch(() => null);
+            if (!usersMap) return;
+
+            const validUsers = [];
+            for (const [uId, uObj] of usersMap) {
+                if (!uObj.bot) validUsers.push(uId);
+            }
+
+            if (validUsers.length === 0) return;
+
+            // Pierwsza osoba na liście reakcji
+            const firstUserId = validUsers[0];
+
+            // Jeśli to użytkownik, który właśnie dodał reakcję i jest pierwszym w kolejności
+            if (user.id === firstUserId) {
+                try {
+                    const member = await guild.members.fetch(user.id).catch(() => null);
+                    if (member && !member.roles.cache.has(TOP1_ROLE_ID)) {
+                        await member.roles.add(TOP1_ROLE_ID).catch(() => {});
+                    }
+                } catch (err) {
+                    console.error('Błąd podczas przydzielania roli Top 1:', err);
+                }
+            }
+        });
     }
 };
