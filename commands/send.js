@@ -4,7 +4,8 @@ const {
     ModalBuilder, 
     TextInputBuilder, 
     TextInputStyle, 
-    ActionRowBuilder 
+    ActionRowBuilder,
+    EmbedBuilder // DODANE: Wymagane do tworzenia Embedu
 } = require('discord.js');
 
 module.exports = {
@@ -39,7 +40,7 @@ module.exports = {
                 )
             );
         } else {
-            // Modal dla Embedu: tylko treść (wiadomość) jest obowiązkowa, reszta opcjonalna
+            // Modal dla Embedu
             modal.addComponents(
                 new ActionRowBuilder().addComponents(
                     new TextInputBuilder()
@@ -79,6 +80,52 @@ module.exports = {
             );
         }
 
-        return await interaction.showModal(modal);
+        // 1. Pokazujemy modal użytkownikowi
+        await interaction.showModal(modal);
+
+        // 2. Czekamy na odpowiedź z modala (limit czasu: 5 minut)
+        const filter = (i) => i.customId === `modal_send_${typ}` && i.user.id === interaction.user.id;
+        
+        try {
+            const modalInteraction = await interaction.awaitModalSubmit({ filter, time: 300_000 });
+
+            // 3. Obsługa w zależności od tego, co użytkownik wybrał
+            if (typ === 'wiadomosc') {
+                const content = modalInteraction.fields.getTextInputValue('send_content');
+                
+                await interaction.channel.send({ content: content });
+                await modalInteraction.reply({ content: '<a:greentick:1543991524738465853> Pomyślnie wysłano wiadomość!', ephemeral: true });
+                
+            } else if (typ === 'embed') {
+                const title = modalInteraction.fields.getTextInputValue('embed_title');
+                const content = modalInteraction.fields.getTextInputValue('embed_content');
+                const footerText = modalInteraction.fields.getTextInputValue('embed_footer');
+                const thumbnail = modalInteraction.fields.getTextInputValue('embed_thumbnail');
+                const image = modalInteraction.fields.getTextInputValue('embed_image');
+
+                const embed = new EmbedBuilder()
+                    .setDescription(content)
+                    .setColor(16764416); // Możesz ustawić własny kolor
+
+                if (title) embed.setTitle(title);
+                
+                // Footer z informacją o autorze (jeśli podał tekst do footera to doklejamy, jeśli nie, to sam autor)
+                if (footerText) {
+                    embed.setFooter({ text: `${footerText} • Stworzone przez ${interaction.user.tag}` });
+                } else {
+                    embed.setFooter({ text: `Stworzone przez ${interaction.user.tag}` });
+                }
+
+                // Bezpieczne ustawianie obrazków (tylko poprawne linki)
+                if (thumbnail && thumbnail.startsWith('http')) embed.setThumbnail(thumbnail);
+                if (image && image.startsWith('http')) embed.setImage(image);
+
+                await interaction.channel.send({ embeds: [embed] });
+                await modalInteraction.reply({ content: '<a:greentick:1543991524738465853> Pomyślnie wysłano Embed!', ephemeral: true });
+            }
+        } catch (err) {
+            // Jeśli użytkownik zamknie modal lub upłynie 5 minut
+            console.error('Błąd lub upłynął czas modala komendy send:', err);
+        }
     },
 };
