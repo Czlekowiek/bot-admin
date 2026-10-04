@@ -41,6 +41,9 @@ module.exports = {
         .addSubcommand(sub => sub.setName('usun').setDescription('Usuwa dowód osobisty (wymaga zgody admina)')),
 
     async execute(interaction) {
+        // System dowodów wyłączony - kod pozostawiony dla przyszłego użytku
+        return interaction.reply({ content: '<a:redtick:1543991522192527450> System dowodów niedostępny', ephemeral: true });
+
         const subcommand = interaction.options.getSubcommand();
         const userId = interaction.user.id;
 
