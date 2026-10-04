@@ -1,0 +1,11 @@
+fontconfig
+fonts-dejavu-core
+libfontconfig1
+libcairo2-dev
+libjpeg-dev
+libpango1.0-dev
+libgif-dev
+librsvg2-dev
+fontconfig
+fonts-dejavu-core
+fonts-liberation
