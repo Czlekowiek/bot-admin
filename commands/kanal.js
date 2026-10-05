@@ -19,7 +19,7 @@ const SMALL_CAPS_MAP = {
     'ą': 'ᴀ̨', 'ć': 'ᴄ́', 'ę': 'ᴇ̨', 'ł': 'ɬ', 'ń': 'ɴ́', 'ó': 'ᴏ́', 'ś': 'ꜱ́', 'ź': 'ʑ', 'ż': 'ʐ',
     'A': 'ᴀ', 'B': 'ʙ', 'C': 'ᴄ', 'D': 'ᴅ', 'E': 'ᴇ', 'F': 'ꜰ', 'G': 'ɢ', 'H': 'ʜ', 'I': 'ɪ', 'J': 'ᴊ',
     'K': 'ᴋ', 'L': 'ʟ', 'M': 'ᴍ', 'N': 'ɴ', 'O': 'ᴏ', 'P': 'ᴘ', 'Q': 'ǫ', 'R': 'ʀ', 'S': 'ꜱ', 'T': 'ᴛ',
-    'U': 'ᴜ', 'V': 'ᴠ', 'W': 'ᴡ', 'X': 'x', 'Y': 'ʏ', 'Z': 'ᴢ',
+    'U': 'ᴜ', 'V': 'ᴠ', 'W': 'ᴡ', 'X': 'x', 'Y': 'ʏ', 'Z': 'ʐ',
     'Ą': 'ᴀ̨', 'Ć': 'ᴄ́', 'Ę': 'ᴇ̨', 'Ł': 'ɬ', 'Ń': 'ɴ́', 'Ó': 'ᴏ́', 'Ś': 'ꜱ́', 'Ź': 'ʑ', 'Ż': 'ʐ'
 };
 
@@ -37,17 +37,17 @@ function zamienNaSmallCaps(tekst) {
 /**
  * Oblicza pozycję dla nowego kanału - w połowie kategorii (nie na górze, nie na dole)
  */
-async function obliczPozycjeKanalu(kategoria) {
-    const kanalyWKategorii = kategoria.children
-        .filter(c => c.type === ChannelType.GuildText)
-        .sort((a, b) => a.rawPosition - b.rawPosition);
+function obliczPozycjeKanalu(kategoria) {
+    // Poprawka: dostajemy się do kolekcji poprzez .cache i używamy .size zamiast .length
+    const kanalyWKategorii = kategoria.children.cache
+        .filter(c => c.type === ChannelType.GuildText);
 
-    if (kanalyWKategorii.length === 0) {
-        return 0;
+    if (kanalyWKategorii.size === 0) {
+        return { pozycja: 0, lacznie: 0 };
     }
 
-    const pozycja = Math.ceil(kanalyWKategorii.length / 2);
-    return pozycja;
+    const pozycja = Math.ceil(kanalyWKategorii.size / 2);
+    return { pozycja, lacznie: kanalyWKategorii.size };
 }
 
 module.exports = {
@@ -97,6 +97,9 @@ module.exports = {
                     });
                 }
 
+                // Poprawka: Pobieramy wszystkie kanały serwera do pamięci (cache), aby kategoria poprawnie widziała swoje dzieci
+                await interaction.guild.channels.fetch().catch(() => null);
+
                 const kategoria = await interaction.guild.channels.fetch(KATEGORIA_ID).catch(() => null);
                 
                 if (!kategoria) {
@@ -107,14 +110,14 @@ module.exports = {
                     return interaction.editReply({ content: '❌ Podane ID nie należy do kategorii!' });
                 }
 
-                const pozycja = await obliczPozycjeKanalu(kategoria);
+                const { pozycja, lacznie } = obliczPozycjeKanalu(kategoria);
 
                 const nowyKanal = await interaction.guild.channels.create({
                     name: pelnaNazwa,
                     type: ChannelType.GuildText,
                     parent: kategoria.id,
-                    position: pozycja,
-                    permissionOverwrites: []
+                    position: pozycja
+                    // Usunięto permissionOverwrites: [], dzięki czemu kanał automatycznie dziedziczy uprawnienia z kategorii
                 });
 
                 try {
@@ -126,7 +129,7 @@ module.exports = {
                 }
 
                 return interaction.editReply({ 
-                    content: `✅ Pomyślnie utworzono kanał reklamowy: **${pelnaNazwa}** (<#${nowyKanal.id}>)\nPozycja w kategorii: ${pozycja + 1} z ${kategoria.children.filter(c => c.type === ChannelType.GuildText).size + 1}` 
+                    content: `✅ Pomyślnie utworzono kanał reklamowy: **${pelnaNazwa}** (<#${nowyKanal.id}>)\nPozycja w kategorii: ${pozycja + 1} z ${lacznie + 1}` 
                 });
 
             } catch (error) {
