@@ -200,7 +200,12 @@ module.exports = {
                     .setColor(0xed4245)
                     .setDescription(
                         `<:arrow:1543977081233342494> **Ping:** <@${interaction.user.id}>\n` +
-                        `<:arrow:1543977081233342494> **Właściciel żąda usunięcia swojego dowodu tożsamości.**\n` +
+                        `<:arrow:1543977081233342494> **Imię i Nazwisko:** ${dowod.imieNazwisko}\n` +
+                        `<:arrow:1543977081233342494> **Data urodzenia:** ${dowod.dataUrodzenia}\n` +
+                        `<:arrow:1543977081233342494> **Miejsce urodzenia:** ${dowod.miejsceUrodzenia}\n` +
+                        `<:arrow:1543977081233342494> **Płeć:** ${dowod.plec}\n` +
+                        `<:arrow:1543977081233342494> **Nick Roblox:** ${dowod.nickRoblox}\n` +
+                        `<:arrow:1543977081233342494> **Nick Discord:** ${dowod.nickDiscord}\n` +
                         `<:arrow:1543977081233342494> **Data prośby:** ${formatDate(new Date())}`
                     );
 
@@ -374,15 +379,28 @@ module.exports = {
                         }
                     }
 
+                    // Dwa embedy w jednej wiadomości logów
                     const oldEmbed = new EmbedBuilder()
                         .setTitle('🪪 Dowód przed edycją')
                         .setColor(0x000000)
-                        .setDescription(`**Imię i Nazwisko:** ${stareDane.imieNazwisko}\n**Roblox:** ${stareDane.nickRoblox}`);
+                        .setDescription(
+                            `<:arrow:1543977081233342494> **Imię i Nazwisko:** ${stareDane.imieNazwisko}\n` +
+                            `<:arrow:1543977081233342494> **Data urodzenia:** ${stareDane.dataUrodzenia}\n` +
+                            `<:arrow:1543977081233342494> **Miejsce urodzenia:** ${stareDane.miejsceUrodzenia}\n` +
+                            `<:arrow:1543977081233342494> **Płeć:** ${stareDane.plec}\n` +
+                            `<:arrow:1543977081233342494> **Nick Roblox:** ${stareDane.nickRoblox}`
+                        );
 
                     const newEmbedLog = new EmbedBuilder()
-                        .setTitle('🪪 Nowy stan dowodu')
+                        .setTitle('🪪 Prośba o Edycję - ZAAKCEPTOWANA')
                         .setColor(0x57f287)
-                        .setDescription(`**Imię i Nazwisko:** ${noweDane.imieNazwisko}\n**Roblox:** ${noweDane.nickRoblox}`)
+                        .setDescription(
+                            `<:arrow:1543977081233342494> **Nowe Imię i Nazwisko:** ${noweDane.imieNazwisko}\n` +
+                            `<:arrow:1543977081233342494> **Nowa data urodzenia:** ${noweDane.dataUrodzenia}\n` +
+                            `<:arrow:1543977081233342494> **Nowe miejsce urodzenia:** ${noweDane.miejsceUrodzenia}\n` +
+                            `<:arrow:1543977081233342494> **Nowa płeć:** ${noweDane.plec}\n` +
+                            `<:arrow:1543977081233342494> **Nowy Roblox:** ${noweDane.nickRoblox}`
+                        )
                         .addFields(
                             { name: 'Data prośby', value: formatDate(createdAt), inline: true },
                             { name: 'Data zaakceptowania', value: formatDate(new Date()), inline: true },
@@ -420,6 +438,7 @@ module.exports = {
         client.on('interactionCreate', async interaction => {
             if (!interaction.isModalSubmit()) return;
 
+            // 1. Złożenie wniosku
             if (interaction.customId === 'modal_dowod_skladanie') {
                 await interaction.deferReply({ ephemeral: true });
                 const imieNazwisko = interaction.fields.getTextInputValue('dowod_imie').trim();
@@ -479,6 +498,7 @@ module.exports = {
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Wniosek został wysłany do weryfikacji!' });
             }
 
+            // 2. Prośba o edycję
             if (interaction.customId === 'modal_dowod_edycja') {
                 await interaction.deferReply({ ephemeral: true });
                 const db = getDb();
@@ -515,6 +535,9 @@ module.exports = {
                     .setDescription(
                         `<:arrow:1543977081233342494> **Ping:** <@${interaction.user.id}>\n` +
                         `<:arrow:1543977081233342494> **Nowe Imię i Nazwisko:** ${noweDane.imieNazwisko}\n` +
+                        `<:arrow:1543977081233342494> **Nowa data urodzenia:** ${noweDane.dataUrodzenia}\n` +
+                        `<:arrow:1543977081233342494> **Nowe miejsce urodzenia:** ${noweDane.miejsceUrodzenia}\n` +
+                        `<:arrow:1543977081233342494> **Nowa płeć:** ${noweDane.plec}\n` +
                         `<:arrow:1543977081233342494> **Nowy Roblox:** ${noweDane.nickRoblox}\n` +
                         `<:arrow:1543977081233342494> **Data prośby:** ${formatDate(new Date())}`
                     );
@@ -529,6 +552,7 @@ module.exports = {
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Wysłano prośbę o edycję do administracji.' });
             }
 
+            // 3. Admin: Szukanie dowodu
             if (interaction.customId === 'modal_admin_szukaj') {
                 await interaction.deferReply({ ephemeral: true });
                 const fraza = interaction.fields.getTextInputValue('szukaj_fraza').trim().toLowerCase();
@@ -559,12 +583,14 @@ module.exports = {
                     );
 
                 const row = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId(`admin_zrob_edycja_${wynik.userId}`).setLabel('Edytuj jako Admin').setStyle(ButtonStyle.Success).setEmoji('✏️'),
                     new ButtonBuilder().setCustomId(`admin_zrob_usun_${wynik.userId}`).setLabel('Usuń jako Admin').setStyle(ButtonStyle.Danger).setEmoji('🗑️')
                 );
 
                 await interaction.editReply({ embeds: [embed], components: [row] });
             }
 
+            // 4. Admin: Ręczne utworzenie
             if (interaction.customId === 'modal_admin_weryfikuj') {
                 await interaction.deferReply({ ephemeral: true });
                 const userId = interaction.fields.getTextInputValue('w_id').trim();
@@ -585,31 +611,101 @@ module.exports = {
                 await sendDm(client, userId, '# <a:checkmark:1543969158646206475> Dowód utworzony\n<:arrow:1543977081233342494> Administrator utworzył dla Ciebie dowód tożsamości.');
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Ręcznie utworzono dowód.' });
             }
-        });
 
-        client.on('interactionCreate', async interaction => {
-            if (!interaction.isButton()) return;
-            if (!interaction.customId.startsWith('admin_zrob_usun_')) return;
+            // 5. Admin: Edycja po zatwierdzeniu modala edycji przez admina
+            if (interaction.customId.startsWith('modal_admin_edytuj_zapisz_')) {
+                await interaction.deferReply({ ephemeral: true });
+                const userId = interaction.customId.replace('modal_admin_edytuj_zapisz_', '');
+                const db = getDb();
+                if (!db) return interaction.editReply({ content: 'Błąd bazy danych.' });
 
-            await interaction.deferReply({ ephemeral: true });
-            const userId = interaction.customId.replace('admin_zrob_usun_', '');
-            const db = getDb();
+                const imieNazwisko = interaction.fields.getTextInputValue('admin_ed_imie').trim();
+                const dataUrodzenia = interaction.fields.getTextInputValue('admin_ed_data').trim();
+                const miejsceUrodzenia = interaction.fields.getTextInputValue('admin_ed_miejsce').trim();
+                const plec = parsePlec(interaction.fields.getTextInputValue('admin_ed_plec').trim());
+                const nickRoblox = interaction.fields.getTextInputValue('admin_ed_roblox').trim();
 
-            if (db) {
                 const dowod = await db.collection('dowody').findOne({ userId });
-                if (dowod && dowod.messageId) {
+                if (!dowod) return interaction.editReply({ content: 'Nie znaleziono dowodu.' });
+
+                await db.collection('dowody').updateOne({ userId }, {
+                    $set: { imieNazwisko, dataUrodzenia, miejsceUrodzenia, plec, nickRoblox, updatedAt: new Date() }
+                });
+
+                if (dowod.messageId) {
                     const channelDowody = await client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
                     if (channelDowody) {
                         const msg = await channelDowody.messages.fetch(dowod.messageId).catch(() => null);
-                        if (msg) await msg.delete().catch(() => {});
+                        if (msg) {
+                            const newEmbed = new EmbedBuilder()
+                                .setTitle(`🪪 Dowód Tożsamości - ${imieNazwisko}`)
+                                .setColor(0x2b2d31)
+                                .setDescription(
+                                    `<:arrow:1543977081233342494> **Imię i Nazwisko:** ${imieNazwisko}\n` +
+                                    `<:arrow:1543977081233342494> **Data urodzenia:** ${dataUrodzenia}\n` +
+                                    `<:arrow:1543977081233342494> **Miejsce urodzenia:** ${miejsceUrodzenia}\n` +
+                                    `<:arrow:1543977081233342494> **Płeć:** ${plec}\n` +
+                                    `<:arrow:1543977081233342494> **Nick Roblox:** ${nickRoblox}\n` +
+                                    `<:arrow:1543977081233342494> **Nick Discord:** ${dowod.nickDiscord}`
+                                )
+                                .setFooter({ text: `Dane dowodu zostały edytowane przez administratora (${formatDate(new Date())})` });
+                            await msg.edit({ embeds: [newEmbed] }).catch(() => {});
+                        }
                     }
                 }
-                await db.collection('dowody').deleteOne({ userId });
+
+                await sendDm(client, userId, '# <a:checkmark:1543969158646206475> Dowód edytowany\n<:arrow:1543977081233342494> Twój dowód został zaktualizowany przez administratora.');
+                await sendLog(client, `# <a:dot:1543969325155745812> **Admin edytował dowód**\n<:arrow:1543977081233342494> **Właściciel:** <@${userId}> | **Admin:** ${interaction.user.tag}`);
+                await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Pomyślnie zaktualizowano dowód użytkownika.' });
+            }
+        });
+
+        // Obsługa przycisków administracyjnych (Usuń / Edytuj bezpośrednio z panelu szukania)
+        client.on('interactionCreate', async interaction => {
+            if (!interaction.isButton()) return;
+
+            // Admin: Usuń bezpośrednio
+            if (interaction.customId.startsWith('admin_zrob_usun_')) {
+                await interaction.deferReply({ ephemeral: true });
+                const userId = interaction.customId.replace('admin_zrob_usun_', '');
+                const db = getDb();
+
+                if (db) {
+                    const dowod = await db.collection('dowody').findOne({ userId });
+                    if (dowod && dowod.messageId) {
+                        const channelDowody = await client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
+                        if (channelDowody) {
+                            const msg = await channelDowody.messages.fetch(dowod.messageId).catch(() => null);
+                            if (msg) await msg.delete().catch(() => {});
+                        }
+                    }
+                    await db.collection('dowody').deleteOne({ userId });
+                }
+
+                await sendDm(client, userId, '# <a:redtick:1543991522192527450> Dowód usunięty\n<:arrow:1543977081233342494> Twój dowód został usunięty przez administratora.');
+                await sendLog(client, `# <a:dot:1543969325155745812> **Admin usunął dowód**\n<:arrow:1543977081233342494> **Właściciel:** <@${userId}> | **Admin:** ${interaction.user.tag}`);
+                await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Usunięto dowód użytkownika.' });
             }
 
-            await sendDm(client, userId, '# <a:redtick:1543991522192527450> Dowód usunięty\n<:arrow:1543977081233342494> Twój dowód został usunięty przez administratora.');
-            await sendLog(client, `# <a:dot:1543969325155745812> **Admin usunął dowód**\n<:arrow:1543977081233342494> **Właściciel:** <@${userId}> | **Admin:** ${interaction.user.tag}`);
-            await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Usunięto dowód użytkownika.' });
+            // Admin: Otwórz modal edycji bezpośredniej
+            if (interaction.customId.startsWith('admin_zrob_edycja_')) {
+                const userId = interaction.customId.replace('admin_zrob_edycja_', '');
+                const db = getDb();
+                if (!db) return interaction.reply({ content: 'Błąd bazy.', ephemeral: true });
+
+                const dowod = await db.collection('dowody').findOne({ userId });
+                if (!dowod) return interaction.reply({ content: 'Nie znaleziono dowodu.', ephemeral: true });
+
+                const modal = new ModalBuilder().setCustomId(`modal_admin_edytuj_zapisz_${userId}`).setTitle('Edycja Dowodu (Admin)');
+                modal.addComponents(
+                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('admin_ed_imie').setLabel('Imię i Nazwisko').setValue(dowod.imieNazwisko).setStyle(TextInputStyle.Short).setRequired(true)),
+                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('admin_ed_data').setLabel('Data urodzenia').setValue(dowod.dataUrodzenia).setStyle(TextInputStyle.Short).setRequired(true)),
+                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('admin_ed_miejsce').setLabel('Miejsce urodzenia').setValue(dowod.miejsceUrodzenia).setStyle(TextInputStyle.Short).setRequired(true)),
+                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('admin_ed_plec').setLabel('Płeć (M / K)').setValue(dowod.plec).setStyle(TextInputStyle.Short).setRequired(true)),
+                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('admin_ed_roblox').setLabel('Nick Roblox').setValue(dowod.nickRoblox).setStyle(TextInputStyle.Short).setRequired(true))
+                );
+                await interaction.showModal(modal);
+            }
         });
     },
 
