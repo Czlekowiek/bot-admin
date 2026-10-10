@@ -97,7 +97,7 @@ module.exports = {
                 ephemeral: true 
             };
             if (interaction.deferred || interaction.replied) {
-                await interaction.followUp(errPayload).catch(console.error);
+                await interaction.editReply(errPayload).catch(console.error);
             } else {
                 await interaction.reply(errPayload).catch(console.error);
             }
@@ -112,17 +112,24 @@ module.exports = {
             const customId = interaction.customId;
 
             if (customId === 'dowod_stworz') {
-                await interaction.reply({
+                const payload = {
                     content: '# <a:checkmark:1543969158646206475> Wniosek\n<:arrow:1543977081233342494> Funkcja formularza jest aktywna. Prześlij swoje dane do weryfikacji.',
                     ephemeral: true
-                });
+                };
+                if (interaction.deferred || interaction.replied) {
+                    await interaction.editReply(payload);
+                } else {
+                    await interaction.reply(payload);
+                }
                 return true;
             }
 
             const [prefix, action, messageId] = customId.split('_');
             if (prefix !== 'dowod') return false;
 
-            await interaction.deferReply({ ephemeral: true });
+            if (!interaction.deferred && !interaction.replied) {
+                await interaction.deferReply({ ephemeral: true });
+            }
 
             // 1. Pobranie danych wniosku z bazy lub pamięci podręcznej
             let wniosekData = localWnioskiCache.get(messageId);
@@ -201,10 +208,14 @@ module.exports = {
                 content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Wystąpił błąd podczas przetwarzania wniosku.', 
                 ephemeral: true 
             };
-            if (interaction.deferred || interaction.replied) {
-                await interaction.followUp(errPayload).catch(console.error);
-            } else {
-                await interaction.reply(errPayload).catch(console.error);
+            try {
+                if (interaction.deferred || interaction.replied) {
+                    await interaction.editReply(errPayload);
+                } else {
+                    await interaction.reply(errPayload);
+                }
+            } catch (e) {
+                console.error('Nie udało się wysłać odpowiedzi o błędzie:', e);
             }
             return true;
         }
