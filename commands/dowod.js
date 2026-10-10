@@ -1,301 +1,212 @@
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { 
+    SlashCommandBuilder, 
+    EmbedBuilder, 
+    ActionRowBuilder, 
+    ButtonBuilder, 
+    ButtonStyle, 
+    PermissionFlagsBits 
+} = require('discord.js');
+const { getDb } = require('../utils/database');
 
-const dowodyDB = new Map();
-const wnioskiDB = new Map();
-const tymczasoweDane = new Map();
-const KANAL_WNIOSKOW = '1549106534561218722';
-const KANAL_DOWODOW = '1548821312166699028';
+// Awaryjny magazyn w pamięci podręcznej na wypadek braku bazy
+const localWnioskiCache = new Map();
 
-async function pobierzLubOdzyskajDowod(guild, userId) {
-    if (dowodyDB.has(userId)) return dowodyDB.get(userId);
-    const kanalDowodow = await guild.channels.fetch(KANAL_DOWODOW).catch(() => null);
-    if (!kanalDowodow) return null;
-    const messages = await kanalDowodow.messages.fetch({ limit: 100 }).catch(() => null);
-    if (!messages) return null;
-    const msg = messages.find(m => m.content.includes(userId));
-    if (msg) {
-        const lines = msg.content.split('\n');
-        const dane = {
-            imie: lines.find(l => l.startsWith('Imię i Nazwisko:'))?.replace('Imię i Nazwisko: ', '').trim() || '',
-            data_ur: lines.find(l => l.startsWith('Data urodzenia:'))?.replace('Data urodzenia: ', '').trim() || '',
-            miejsce_ur: lines.find(l => l.startsWith('Miejsce urodzenia:'))?.replace('Miejsce urodzenia: ', '').trim() || '',
-            plec: lines.find(l => l.startsWith('Płeć:'))?.replace(/Płeć:.*?(M\/K)?/, '').replace('(', '').replace(')', '').trim() || 'M/K',
-            roblox: lines.find(l => l.startsWith('Nick Roblox:'))?.replace('Nick Roblox: ', '').trim() || '',
-            discord: lines.find(l => l.startsWith('Nick Discord:'))?.replace('Nick Discord: ', '').trim() || '',
-            praca: lines.find(l => l.startsWith('Aktualna praca:'))?.replace('Aktualna praca: ', '').trim() || ''
-        };
-        const dowodObj = { wiadomoscId: msg.id, linkWiadomosci: msg.url, dane };
-        dowodyDB.set(userId, dowodObj);
-        return dowodObj;
-    }
-    return null;
+/**
+ * Funkcja do precyzyjnego wyciągania płci z tekstu wniosku
+ */
+function parsePlec(text) {
+    if (!text) return "Nieznana";
+    
+    const match = text.match(/Płeć:\s*([^\n]+)/i);
+    if (!match) return "Nieznana";
+
+    const rawValue = match[1].trim().toUpperCase();
+    if (rawValue.startsWith('K')) return 'K';
+    if (rawValue.startsWith('M')) return 'M';
+
+    return "Nieznana";
 }
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('dowod')
-        .setDescription('Zarządzanie dowodem osobistym')
-        .addSubcommand(sub => sub.setName('stworz').setDescription('Tworzy wniosek o dowód osobisty'))
-        .addSubcommand(sub => sub.setName('pokaz').setDescription('Pokazuje Twój dowód osobisty'))
-        .addSubcommand(sub => sub.setName('edytuj').setDescription('Edytuje dane w dowodzie (wymaga zgody admina)'))
-        .addSubcommand(sub => sub.setName('usun').setDescription('Usuwa dowód osobisty (wymaga zgody admina)')),
+        .setDescription('Zarządzanie systemem dowodów tożsamości.')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+        .addSubcommand(sub =>
+            sub.setName('panel')
+                .setDescription('Wysyła panel składania wniosku o dowód.'))
+        .addSubcommand(sub =>
+            sub.setName('weryfikuj')
+                .setDescription('Ręcznie weryfikuje dowód użytkownika.')
+                .addUserOption(opt => opt.setName('uzytkownik').setDescription('Wybierz użytkownika.').setRequired(true))
+                .addStringOption(opt => opt.setName('imie_nazwisko').setDescription('Podaj imię i nazwisko.').setRequired(true))
+                .addStringOption(opt => opt.setName('plec').setDescription('Podaj płeć (K/M).').setRequired(true))),
 
     async execute(interaction) {
-        // System dowodów wyłączony - kod pozostawiony dla przyszłego użytku
-        return interaction.reply({ content: '<a:redtick:1543991522192527450> System dowodów niedostępny', ephemeral: true });
+        try {
+            const subcommand = interaction.options.getSubcommand();
 
-        const subcommand = interaction.options.getSubcommand();
-        const userId = interaction.user.id;
+            if (subcommand === 'panel') {
+                const embed = new EmbedBuilder()
+                    .setTitle('🪪 Wyrobienie Dowodu Tożsamości')
+                    .setDescription('Kliknij poniższy przycisk, aby złożyć wniosek o wyrobienie dowodu tożsamości.')
+                    .setColor(0x2b2d31);
 
-        if (subcommand === 'stworz') {
-            if (await pobierzLubOdzyskajDowod(interaction.guild, userId)) {
-                return interaction.reply({ content: '<a:redtick:1543991522192527450> Masz już aktywny dowód osobisty! Użyj opcji edycji lub usuń obecny.', ephemeral: true });
-            }
-            const modal = new ModalBuilder().setCustomId('modal_dowod_krok1').setTitle('Tworzenie dowodu: Dane (1/2)');
-            modal.addComponents(
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('imie').setLabel('Imię i Nazwisko').setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('data_ur').setLabel('Data urodzenia (np. 01.01.2000)').setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('miejsce_ur').setLabel('Miejsce urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('plec').setLabel('Płeć (M / K)').setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('praca').setLabel('Aktualna praca').setStyle(TextInputStyle.Short).setRequired(true))
-            );
-            return await interaction.showModal(modal);
-        }
+                const row = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('dowod_stworz')
+                        .setLabel('Złóż wniosek')
+                        .setStyle(ButtonStyle.Primary)
+                        .setEmoji('🪪')
+                );
 
-        if (subcommand === 'pokaz') {
-            const dowod = dowodyDB.get(userId) || await pobierzLubOdzyskajDowod(interaction.guild, userId);
-            if (!dowod) {
-                return interaction.reply({ content: '<a:redtick:1543991522192527450> Nie posiadasz jeszcze zatwierdzonego dowodu osobistego! Możesz go utworzyć za pomocą `/dowod stworz`.', ephemeral: true });
-            }
-            return interaction.reply({ content: `<a:greentick:1543991524738465853> Oto Twój dowód: ${dowod.linkWiadomosci}`, ephemeral: true });
-        }
+                await interaction.reply({ embeds: [embed], components: [row] });
+            } else if (subcommand === 'weryfikuj') {
+                await interaction.deferReply({ ephemeral: true });
 
-        if (subcommand === 'edytuj') {
-            let istniejacyDowod = dowodyDB.get(userId);
-            if (!istniejacyDowod) {
-                istniejacyDowod = await pobierzLubOdzyskajDowod(interaction.guild, userId);
-            }
-            if (!istniejacyDowod) {
-                return interaction.reply({ content: '<a:redtick:1543991522192527450> Nie masz jeszcze swojego dowodu osobistego, więc nie masz czego edytować.', ephemeral: true });
-            }
-            const istniejacy = istniejacyDowod.dane;
-            const modal = new ModalBuilder().setCustomId('modal_dowod_edytuj_krok1').setTitle('Edycja dowodu: Dane (1/2)');
-            modal.addComponents(
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('imie').setLabel('Imię i Nazwisko').setValue(istniejacy.imie || '').setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('data_ur').setLabel('Data urodzenia').setValue(istniejacy.data_ur || '').setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('miejsce_ur').setLabel('Miejsce urodzenia').setValue(istniejacy.miejsce_ur || '').setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('plec').setLabel('Płeć (M / K)').setValue(istniejacy.plec || '').setStyle(TextInputStyle.Short).setRequired(true)),
-                new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('praca').setLabel('Aktualna praca').setValue(istniejacy.praca || '').setStyle(TextInputStyle.Short).setRequired(true))
-            );
-            return await interaction.showModal(modal);
-        }
+                const targetUser = interaction.options.getUser('uzytkownik');
+                const imieNazwisko = interaction.options.getString('imie_nazwisko');
+                const rawPlec = interaction.options.getString('plec');
+                const plec = parsePlec(`Płeć: ${rawPlec}`);
 
-        if (subcommand === 'usun') {
-            let istniejacyDowod = dowodyDB.get(userId);
-            if (!istniejacyDowod) {
-                istniejacyDowod = await pobierzLubOdzyskajDowod(interaction.guild, userId);
-            }
-            if (!istniejacyDowod) return interaction.reply({ content: '<a:redtick:1543991522192527450> Nie posiadasz aktywnego dowodu.', ephemeral: true });
-
-            const channel = await interaction.guild.channels.fetch(KANAL_WNIOSKOW).catch(() => null);
-            if (!channel) return interaction.reply({ content: '<a:redtick:1543991522192527450> Błąd kanału wniosków.', ephemeral: true });
-
-            const dane = istniejacyDowod.dane;
-            const embed = new EmbedBuilder()
-                .setTitle('Wniosek o usunięcie dowodu osobistego')
-                .setColor(0xe67e22)
-                .setDescription(`**Właściciel wniosku:** <@${userId}>\n\n### <a:warning:1544007767453339648> Dowód przeznaczony do usunięcia:\n• **Imię i Nazwisko:** ${dane.imie}\n• **Data urodzenia:** ${dane.data_ur}\n• **Miejsce urodzenia:** ${dane.miejsce_ur}\n• **Płeć:** ${dane.plec}\n• **Nick Roblox:** ${dane.roblox}\n• **Nick Discord:** ${dane.discord}\n• **Praca:** ${dane.praca}`);
-
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId(`dowod_akceptuj_usun_${userId}`).setLabel('Zatwierdź usunięcie').setStyle(ButtonStyle.Success),
-                new ButtonBuilder().setCustomId(`dowod_odrzuc_usun_${userId}`).setLabel('Odrzuć wniosek').setStyle(ButtonStyle.Danger)
-            );
-
-            const msg = await channel.send({ embeds: [embed], components: [row] });
-            wnioskiDB.set(msg.id, { type: 'usun', userId, dane });
-
-            try {
-                if (interaction.client && typeof interaction.client.sendLog === 'function') {
-                    await interaction.client.sendLog(`<a:neon_staff:1550909470605844650> Użytkownik **${interaction.user.tag}** złożył wniosek o usunięcie swojego dowodu.`);
+                const db = getDb();
+                if (db) {
+                    await db.collection('dowody').updateOne(
+                        { userId: targetUser.id },
+                        { $set: { imieNazwisko, plec, verifiedAt: new Date(), verifiedBy: interaction.user.id } },
+                        { upsert: true }
+                    );
                 }
-            } catch (e) {}
 
-            return interaction.reply({ content: '<a:greentick:1543991524738465853> Wniosek o usunięcie dowodu został wysłany do administracji.', ephemeral: true });
+                await interaction.editReply({ 
+                    content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Pomyślnie zweryfikowano dowód dla <@' + targetUser.id + '> (' + imieNazwisko + ', Płeć: ' + plec + ').' 
+                });
+
+                if (typeof interaction.client.sendLog === 'function') {
+                    await interaction.client.sendLog(
+                        interaction.guild,
+                        'Ręczna weryfikacja dowodu',
+                        `**Gracz:** <@${targetUser.id}>\n**Dane:** ${imieNazwisko} [${plec}]\n**Weryfikujący:** ${interaction.user.tag}`
+                    );
+                }
+            }
+        } catch (error) {
+            console.error('Błąd w komendzie /dowod:', error);
+            const errPayload = { 
+                content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Wystąpił błąd podczas wykonywania tej komendy.', 
+                ephemeral: true 
+            };
+            if (interaction.deferred || interaction.replied) {
+                await interaction.followUp(errPayload).catch(console.error);
+            } else {
+                await interaction.reply(errPayload).catch(console.error);
+            }
         }
     },
 
-    setupEvents(client) {
-        client.on('interactionCreate', async interaction => {
-            if (interaction.isModalSubmit()) {
-                const userId = interaction.user.id;
+    /**
+     * Obsługa interakcji przycisków wniosek / akceptuj / odrzuć
+     */
+    async handleButton(interaction) {
+        try {
+            const customId = interaction.customId;
 
-                if (interaction.customId === 'modal_dowod_krok1' || interaction.customId === 'modal_dowod_edytuj_krok1') {
-                    const isEdit = interaction.customId.includes('edytuj');
-                    const imie = interaction.fields.getTextInputValue('imie');
-                    const data_ur = interaction.fields.getTextInputValue('data_ur');
-                    const miejsce_ur = interaction.fields.getTextInputValue('miejsce_ur');
-                    const plec = interaction.fields.getTextInputValue('plec');
-                    const praca = interaction.fields.getTextInputValue('praca');
-
-                    tymczasoweDane.set(userId, { imie, data_ur, miejsce_ur, plec, praca, isEdit });
-                    const row = new ActionRowBuilder().addComponents(
-                        new ButtonBuilder().setCustomId(`dowod_kontynuuj_${userId}`).setLabel('Przejdź do kroku 2 (Roblox/Discord)').setStyle(ButtonStyle.Primary)
-                    );
-                    return interaction.reply({ content: '<a:greentick:1543991524738465853> Zapisano pierwszy krok! Kliknij poniższy przycisk, aby uzupełnić drugą część formularza.', components: [row], ephemeral: true });
-                }
-
-                if (interaction.customId === 'modal_dowod_krok2' || interaction.customId === 'modal_dowod_edytuj_krok2') {
-                    const isEdit = interaction.customId.includes('edytuj');
-                    const dane1 = tymczasoweDane.get(userId);
-                    if (!dane1) return interaction.reply({ content: '<a:redtick:1543991522192527450> Wygasły dane z pierwszego kroku. Zacznij od nowa.', ephemeral: true });
-
-                    const roblox = interaction.fields.getTextInputValue('roblox');
-                    const discordNick = interaction.fields.getTextInputValue('discord');
-                    const channel = await interaction.guild.channels.fetch(KANAL_WNIOSKOW).catch(() => null);
-                    if (!channel) return interaction.reply({ content: '<a:redtick:1543991522192527450> Błąd kanału wniosków.', ephemeral: true });
-
-                    const pelneDane = { ...dane1, roblox, discord: discordNick };
-                    const akcjaTyp = isEdit ? 'edytuj' : 'stworz';
-                    const embed = new EmbedBuilder();
-
-                    if (isEdit) {
-                        const istniejacyDowod = dowodyDB.get(userId) || await pobierzLubOdzyskajDowod(interaction.guild, userId);
-                        const starych = istniejacyDowod ? istniejacyDowod.dane : {};
-                        embed.setTitle('Wniosek o edycję dowodu osobistego').setColor(0x3498db)
-                            .setDescription(`**Właściciel:** <@${userId}>\n\n### <a:warning:1544007767453339648> Dane przed zmianą:\n• **Imię i Nazwisko:** ${starych.imie || 'Brak'}\n• **Data urodzenia:** ${starych.data_ur || 'Brak'}\n• **Miejsce urodzenia:** ${starych.miejsce_ur || 'Brak'}\n• **Płeć:** ${starych.plec || 'Brak'}\n• **Nick Roblox:** ${starych.roblox || 'Brak'}\n• **Nick Discord:** ${starych.discord || 'Brak'}\n• **Praca:** ${starych.praca || 'Brak'}\n\n### <a:greentick:1543991524738465853> Dane po zmianie (Nowe):\n• **Imię i Nazwisko:** ${pelneDane.imie}\n• **Data urodzenia:** ${pelneDane.data_ur}\n• **Miejsce urodzenia:** ${pelneDane.miejsce_ur}\n• **Płeć:** ${pelneDane.plec}\n• **Nick Roblox:** ${pelneDane.roblox}\n• **Nick Discord:** ${pelneDane.discord}\n• **Praca:** ${pelneDane.praca}`);
-                    } else {
-                        embed.setTitle('Nowy wniosek o dowód osobisty').setColor(0x3498db)
-                            .setDescription(`**Właściciel:** <@${userId}>\n\n**Imię i Nazwisko:** ${pelneDane.imie}\n**Data urodzenia:** ${pelneDane.data_ur}\n**Miejsce urodzenia:** ${pelneDane.miejsce_ur}\n**Płeć:** ${pelneDane.plec}\n**Nick Roblox:** ${pelneDane.roblox}\n**Nick Discord:** ${pelneDane.discord}\n**Aktualna praca:** ${pelneDane.praca}`);
-                    }
-
-                    const row = new ActionRowBuilder().addComponents(
-                        new ButtonBuilder().setCustomId(`dowod_akceptuj_${akcjaTyp}_${userId}`).setLabel('Akceptuj').setStyle(ButtonStyle.Success),
-                        new ButtonBuilder().setCustomId(`dowod_odrzuc_${akcjaTyp}_${userId}`).setLabel('Odrzuć').setStyle(ButtonStyle.Danger)
-                    );
-
-                    const msg = await channel.send({ embeds: [embed], components: [row] });
-                    wnioskiDB.set(msg.id, { type: akcjaTyp, userId, dane: pelneDane });
-                    tymczasoweDane.delete(userId);
-
-                    try {
-                        if (typeof client.sendLog === 'function') {
-                            await client.sendLog(`<a:neon_staff:1550909470605844650> Użytkownik **${interaction.user.tag}** utworzył wniosek typu **${akcjaTyp}** o dowód osobisty.`);
-                        }
-                    } catch (e) {}
-
-                    return interaction.reply({ content: '<a:greentick:1543991524738465853> Wniosek został w pełni uzupełniony i wysłany do administracji!', ephemeral: true });
-                }
+            if (customId === 'dowod_stworz') {
+                await interaction.reply({
+                    content: '# <a:dot:1543969325155745812> Wniosek\n<:arrow:1543977081233342494> Funkcja formularza jest aktywna. Prześlij swoje dane do weryfikacji.',
+                    ephemeral: true
+                });
+                return;
             }
 
-            if (interaction.isButton() && interaction.customId.startsWith('dowod_')) {
-                if (interaction.customId.startsWith('dowod_kontynuuj_')) {
-                    const targetId = interaction.customId.split('_')[2];
-                    if (interaction.user.id !== targetId) return interaction.reply({ content: '<a:redtick:1543991522192527450> To nie jest Twój formularz!', ephemeral: true });
+            const [prefix, action, messageId] = customId.split('_');
+            if (prefix !== 'dowod') return;
 
-                    const dane1 = tymczasoweDane.get(targetId);
-                    const modal = new ModalBuilder().setCustomId(dane1?.isEdit ? 'modal_dowod_edytuj_krok2' : 'modal_dowod_krok2').setTitle('Dowód: Nicki (2/2)');
-                    modal.addComponents(
-                        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('roblox').setLabel('Nick Roblox').setStyle(TextInputStyle.Short).setRequired(true)),
-                        new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('discord').setLabel('Nick Discord').setStyle(TextInputStyle.Short).setRequired(true))
+            await interaction.deferReply({ ephemeral: true });
+
+            // 1. Pobranie danych wniosku z bazy lub pamięci podręcznej
+            let wniosekData = localWnioskiCache.get(messageId);
+            const db = getDb();
+
+            if (!wniosekData && db) {
+                wniosekData = await db.collection('wnioski_dowody').findOne({ messageId: messageId });
+            }
+
+            // 2. Odporność na brak danych po restarcie bota
+            if (!wniosekData || !wniosekData.dane) {
+                return interaction.editReply({
+                    content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie odnaleziono danych tego wniosku w bazie danych (wniosek mógł wygasnąć lub zostać rozpatrzony po zrestartowaniu bota).'
+                });
+            }
+
+            if (action === 'akceptuj') {
+                const { userId, imieNazwisko, plec } = wniosekData.dane;
+
+                if (db) {
+                    await db.collection('dowody').updateOne(
+                        { userId: userId },
+                        { $set: { imieNazwisko, plec, approvedAt: new Date() } },
+                        { upsert: true }
                     );
-                    return await interaction.showModal(modal);
+                    await db.collection('wnioski_dowody').deleteOne({ messageId: messageId });
+                }
+                localWnioskiCache.delete(messageId);
+
+                // Aktualizacja embeda wiadomości
+                const originalEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+                    .setColor(0x57f287)
+                    .setTitle('🪪 Wniosek o Dowód - ZAAKCEPTOWANY');
+
+                await interaction.message.edit({ embeds: [originalEmbed], components: [] });
+                await interaction.editReply({ 
+                    content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Zaakceptowano wniosek o dowód.' 
+                });
+
+                if (typeof interaction.client.sendLog === 'function') {
+                    await interaction.client.sendLog(
+                        interaction.guild,
+                        'Zaakceptowano Dowód',
+                        `**Wnioskodawca:** <@${userId}>\n**Dane:** ${imieNazwisko} [${plec}]\n**Rozpatrujący:** ${interaction.user.tag}`
+                    );
                 }
 
-                if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-                    return interaction.reply({ content: '<a:redtick:1543991522192527450> Nie masz uprawnień administratora do obsługi tego wniosku.', ephemeral: true });
+            } else if (action === 'odrzuc') {
+                if (db) {
+                    await db.collection('wnioski_dowody').deleteOne({ messageId: messageId });
                 }
+                localWnioskiCache.delete(messageId);
 
-                await interaction.deferUpdate();
-                const parts = interaction.customId.split('_');
-                const [_, akcja, typ, targetUserId] = parts;
-                const wniosek = wnioskiDB.get(interaction.message.id);
-                const embed = EmbedBuilder.from(interaction.message.embeds[0]);
-                const disabledRow = new ActionRowBuilder().addComponents(
-                    interaction.message.components[0].components.map(btn => ButtonBuilder.from(btn).setDisabled(true))
-                );
+                const originalEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+                    .setColor(0xed4245)
+                    .setTitle('🪪 Wniosek o Dowód - ODRZUCONY');
 
-                if (akcja === 'odrzuc') {
-                    wnioskiDB.delete(interaction.message.id);
-                    try { 
-                        const user = await interaction.client.users.fetch(targetUserId); 
-                        await user.send('<a:redtick:1543991522192527450> Twoja prośba dotycząca dowodu osobistego została odrzucona przez administrację.'); 
-                    } catch (e) {}
-                    
-                    embed.setColor(0xe74c3c).setDescription(`<a:redtick:1543991522192527450> **Wniosek odrzucony przez <@${interaction.user.id}>**\n\n` + embed.data.description);
-                    await interaction.message.edit({ embeds: [embed], components: [disabledRow] });
+                await interaction.message.edit({ embeds: [originalEmbed], components: [] });
+                await interaction.editReply({ 
+                    content: '# <a:redtick:1543991522192527450> Odrzucono\n<:arrow:1543977081233342494> Odrzucono wniosek o dowód.' 
+                });
 
-                    try {
-                        if (typeof client.sendLog === 'function') {
-                            await client.sendLog(`<a:redtick:1543991522192527450> Administrator **${interaction.user.tag}** odrzucił wniosek użytkownika o ID \`${targetUserId}\`.`);
-                        }
-                    } catch (e) {}
-
-                    return interaction.followUp({ content: 'Odrzucono wniosek.', ephemeral: true });
-                }
-
-                if (akcja === 'akceptuj' && typ === 'stworz') {
-                    const kanalDowodow = await interaction.guild.channels.fetch(KANAL_DOWODOW).catch(() => null);
-                    if (!kanalDowodow) return interaction.followUp({ content: 'Nie znaleziono kanału docelowego dowodów.', ephemeral: true });
-                    const dane = wniosek.dane;
-                    const tekst = `🪪 DOWÓD OSOBISTY (<@${targetUserId}>) | OBYWATEL POLSKICH DRÓG \n\n**Dane Osobowe**\nImię i Nazwisko: ${dane.imie}\nData urodzenia: ${dane.data_ur}\nMiejsce urodzenia: ${dane.miejsce_ur}\nPłeć: (M/K) ${dane.plec}\nNick Roblox: ${dane.roblox}\nNick Discord: ${dane.discord}\nAktualna praca: ${dane.praca}`;
-                    const wyslanaWiadomosc = await kanalDowodow.send(tekst);
-                    dowodyDB.set(targetUserId, { wiadomoscId: wyslanaWiadomosc.id, linkWiadomosci: wyslanaWiadomosc.url, dane });
-                    wnioskiDB.delete(interaction.message.id);
-                    embed.setColor(0x2ecc71).setDescription(`<a:greentick:1543991524738465853> **Wniosek zaakceptowany przez <@${interaction.user.id}>**\n\n` + embed.data.description);
-                    await interaction.message.edit({ embeds: [embed], components: [disabledRow] });
-
-                    try {
-                        if (typeof client.sendLog === 'function') {
-                            await client.sendLog(`<a:greentick:1543991524738465853> Administrator **${interaction.user.tag}** zatwierdził nowy dowód osobisty dla użytkownika <@${targetUserId}>.`);
-                        }
-                    } catch (e) {}
-
-                    return interaction.followUp({ content: 'Zaakceptowano wniosek i utworzono dowód.', ephemeral: true });
-                }
-
-                if (akcja === 'akceptuj' && typ === 'edytuj') {
-                    const istniejacyDowod = dowodyDB.get(targetUserId) || await pobierzLubOdzyskajDowod(interaction.guild, targetUserId);
-                    if (!istniejacyDowod) return interaction.followUp({ content: 'Użytkownik nie ma aktywnego dowodu.', ephemeral: true });
-                    const kanalDowodow = await interaction.guild.channels.fetch(KANAL_DOWODOW).catch(() => null);
-                    const staryWpis = kanalDowodow ? await kanalDowodow.messages.fetch(istniejacyDowod.wiadomoscId).catch(() => null) : null;
-                    const dane = wniosek.dane;
-                    const nowyTekst = `🪪 DOWÓD OSOBISTY (<@${targetUserId}>) | OBYWATEL POLSKICH DRÓG \n\n**Dane Osobowe**\nImię i Nazwisko: ${dane.imie}\nData urodzenia: ${dane.data_ur}\nMiejsce urodzenia: ${dane.miejsce_ur}\nPłeć: (M/K) ${dane.plec}\nNick Roblox: ${dane.roblox}\nNick Discord: ${dane.discord}\nAktualna praca: ${dane.praca}`;
-                    if (staryWpis) await staryWpis.edit(nowyTekst);
-                    istniejacyDowod.dane = dane;
-                    wnioskiDB.delete(interaction.message.id);
-                    embed.setColor(0x2ecc71).setDescription(`<a:greentick:1543991524738465853> **Edycja zatwierdzona przez <@${interaction.user.id}>**\n\n` + embed.data.description);
-                    await interaction.message.edit({ embeds: [embed], components: [disabledRow] });
-
-                    try {
-                        if (typeof client.sendLog === 'function') {
-                            await client.sendLog(`<a:greentick:1543991524738465853> Administrator **${interaction.user.tag}** zatwierdził edycję dowodu dla <@${targetUserId}>.`);
-                        }
-                    } catch (e) {}
-
-                    return interaction.followUp({ content: 'Zaktualizowano dowód użytkownika.', ephemeral: true });
-                }
-
-                if (akcja === 'akceptuj' && typ === 'usun') {
-                    const istniejacyDowod = dowodyDB.get(targetUserId) || await pobierzLubOdzyskajDowod(interaction.guild, targetUserId);
-                    if (istniejacyDowod) {
-                        const kanalDowodow = await interaction.guild.channels.fetch(KANAL_DOWODOW).catch(() => null);
-                        const staryWpis = kanalDowodow ? await kanalDowodow.messages.fetch(istniejacyDowod.wiadomoscId).catch(() => null) : null;
-                        if (staryWpis) await staryWpis.delete().catch(() => {});
-                        dowodyDB.delete(targetUserId);
-                    }
-                    wnioskiDB.delete(interaction.message.id);
-                    embed.setColor(0xf1c40f).setDescription(`<a:warning:1544007767453339648> **Usunięcie dowodu zatwierdzone przez <@${interaction.user.id}>**\n\n` + embed.data.description);
-                    await interaction.message.edit({ embeds: [embed], components: [disabledRow] });
-
-                    try {
-                        if (typeof client.sendLog === 'function') {
-                            await client.sendLog(`<a:warning:1544007767453339648> Administrator **${interaction.user.tag}** zatwierdził usunięcie dowodu użytkownika <@${targetUserId}>.`);
-                        }
-                    } catch (e) {}
-
-                    return interaction.followUp({ content: 'Usunięto dowód użytkownika.', ephemeral: true });
+                if (typeof interaction.client.sendLog === 'function') {
+                    await interaction.client.sendLog(
+                        interaction.guild,
+                        'Odrzucono Dowód',
+                        `**Wnioskodawca:** <@${wniosekData.dane.userId}>\n**Rozpatrujący:** ${interaction.user.tag}`
+                    );
                 }
             }
-        });
-    }
+        } catch (error) {
+            console.error('Błąd podczas obsługi przycisku w dowod.js:', error);
+            const errPayload = { 
+                content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Wystąpił błąd podczas przetwarzania wniosku.', 
+                ephemeral: true 
+            };
+            if (interaction.deferred || interaction.replied) {
+                await interaction.followUp(errPayload).catch(console.error);
+            } else {
+                await interaction.reply(errPayload).catch(console.error);
+            }
+        }
+    },
+
+    parsePlec,
+    localWnioskiCache
 };

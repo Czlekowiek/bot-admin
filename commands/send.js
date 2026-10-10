@@ -14,7 +14,7 @@ module.exports = {
         .setDescription('Wysyła wiadomość lub embed jako bot.')
         .addStringOption(option =>
             option.setName('typ')
-                .setDescription('Wybierz co chcesz wysłać')
+                .setDescription('Wybierz typ wiadomości do wysłania.')
                 .setRequired(true)
                 .addChoices(
                     { name: 'Wiadomość', value: 'wiadomosc' },
@@ -25,8 +25,6 @@ module.exports = {
     async execute(interaction) {
         const typ = interaction.options.getString('typ');
 
-        // Tworzymy unikalny identyfikator dla tej konkretnej sesji komendy,
-        // co zapobiega nakładaniu się starych, zamkniętych modali.
         const uniqueId = `${interaction.user.id}_${Date.now()}`;
         const modalCustomId = `modal_send_${typ}_${uniqueId}`;
 
@@ -84,21 +82,21 @@ module.exports = {
             );
         }
 
-        // 1. Pokazujemy modal użytkownikowi
         await interaction.showModal(modal);
 
-        // 2. Czekamy na odpowiedź z modala używając unikalnego ID
         const filter = (i) => i.customId === modalCustomId && i.user.id === interaction.user.id;
         
         try {
             const modalInteraction = await interaction.awaitModalSubmit({ filter, time: 300_000 });
 
-            // 3. Obsługa wysyłania
             if (typ === 'wiadomosc') {
                 const content = modalInteraction.fields.getTextInputValue('send_content');
                 
                 await interaction.channel.send({ content: content });
-                await modalInteraction.reply({ content: '<a:greentick:1543991524738465853> Pomyślnie wysłano wiadomość!', ephemeral: true });
+                await modalInteraction.reply({ 
+                    content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Pomyślnie wysłano wiadomość!', 
+                    ephemeral: true 
+                });
                 
             } else if (typ === 'embed') {
                 const title = modalInteraction.fields.getTextInputValue('embed_title');
@@ -123,7 +121,10 @@ module.exports = {
                 if (image && image.startsWith('http')) embed.setImage(image);
 
                 await interaction.channel.send({ embeds: [embed] });
-                await modalInteraction.reply({ content: '<a:greentick:1543991524738465853> Pomyślnie wysłano Embed!', ephemeral: true });
+                await modalInteraction.reply({ 
+                    content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Pomyślnie wysłano Embed!', 
+                    ephemeral: true 
+                });
             }
         } catch (err) {
             // Ignorujemy błędy timeoutu / zamknięcia modala

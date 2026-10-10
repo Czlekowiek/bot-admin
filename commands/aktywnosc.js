@@ -1,7 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const { getDb } = require('../utils/database');
 
-// Słownik emotek cyfr od 0 do 9
 const DIGIT_EMOJIS = {
     '0': '<:0_:1543975892429053982>',
     '1': '<:1_:1543975655287558246>',
@@ -15,7 +14,6 @@ const DIGIT_EMOJIS = {
     '9': '<:9_:1543975879984554014>'
 };
 
-// Funkcja zamieniająca np. "31" na string z emotkami cyfr
 function formatNumberToEmojis(numberStr) {
     return String(numberStr)
         .split('')
@@ -65,7 +63,6 @@ async function updateActivityBoard(message, usersList) {
     const embed = message.embeds[0];
     const description = embed.description || '';
     
-    // Dynamiczne wyciąganie dnia oraz opisu niezależnie od ich kolejności
     const parts = description.split('\n\n## <a:dot:1543969325155745812> ');
     let dzienEmotki = null;
     let activityDescription = null;
@@ -104,7 +101,7 @@ async function updateActivityBoard(message, usersList) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('aktywnosc')
-        .setDescription('Tworzy wiadomość o aktywność check')
+        .setDescription('Tworzy wiadomość z panelem aktywności.')
         .addStringOption(option =>
             option.setName('opis')
                 .setDescription('(opcjonalnie)')
@@ -164,7 +161,7 @@ module.exports = {
         await saveActivityData(sentMessage.id, [], false);
 
         return interaction.editReply({ 
-            content: '# <a:dot:1543969325155745812> Sukces\n<:arrow:1543977081233342494> Utworzono wiadomość aktywności na kanale <#' + channel.id + '>.' 
+            content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Utworzono wiadomość aktywności na kanale <#' + channel.id + '>.' 
         });
     },
 

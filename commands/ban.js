@@ -13,7 +13,7 @@ const TARGET_CHANNEL_ID = '1556307155693600768';
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('wystaw-bana')
-        .setDescription('Wystawia informację o banie na wyznaczonym kanale')
+        .setDescription('Wystawia informację o banie na wyznaczonym kanale.')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction) {
@@ -73,7 +73,6 @@ module.exports = {
             const duration = interaction.fields.getTextInputValue('ban_duration').trim();
             const banner = interaction.user;
 
-            // Pobieranie oznaczenia użytkownika (wzmianka lub ID, jeśli użytkownika nie ma w cache)
             let userTag = `<@${targetUserId}> (${targetUserId})`;
             try {
                 const fetchedUser = await client.users.fetch(targetUserId);
@@ -84,7 +83,6 @@ module.exports = {
                 // Jeśli ID jest nieprawidłowe lub użytkownik nie istnieje, zostaje sformatowane jako ID
             }
 
-            // Pobieranie aktualnej daty i godziny
             const now = new Date();
             const formattedDate = now.toLocaleString('pl-PL', {
                 timeZone: 'Europe/Warsaw',
@@ -95,7 +93,6 @@ module.exports = {
                 minute: '2-digit'
             });
 
-            // Główny embed informacyjny
             const mainEmbed = new EmbedBuilder()
                 .setColor(0xbf0704)
                 .setTitle('<:banhammer:1556309107672092683> Ban Discord')
@@ -109,10 +106,8 @@ module.exports = {
 
             const embedsToSend = [mainEmbed];
 
-            // Parsowanie linków z dowodami (rozdzielone spacjami, nowymi liniami lub przecinkami)
             const links = proofsRaw.split(/[\s,]+/).filter(link => link.startsWith('http://') || link.startsWith('https://'));
 
-            // Tworzenie dodatkowego embedu dla każdego linku z dowodem (tylko pole image)
             for (const link of links) {
                 const proofEmbed = new EmbedBuilder()
                     .setColor(0xbf0704)
@@ -120,14 +115,17 @@ module.exports = {
                 embedsToSend.push(proofEmbed);
             }
 
-            // Wysłanie wiadomości na docelowy kanał
             const channel = await client.channels.fetch(TARGET_CHANNEL_ID).catch(() => null);
             if (!channel) {
-                return interaction.editReply({ content: '❌ Nie znaleziono kanału docelowego o podanym ID!' });
+                return interaction.editReply({ 
+                    content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie znaleziono kanału docelowego o podanym ID!' 
+                });
             }
 
             await channel.send({ embeds: embedsToSend });
-            return interaction.editReply({ content: '✅ Pomyślnie wystawiono informację o banie!' });
+            return interaction.editReply({ 
+                content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Pomyślnie wystawiono informację o banie!' 
+            });
         });
     }
 };
