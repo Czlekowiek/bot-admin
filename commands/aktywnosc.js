@@ -81,14 +81,16 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction) {
+        // Natychmiastowe odroczenie odpowiedzi zapobiegające błędowi "Aplikacja nie reaguje"
+        await interaction.deferReply({ ephemeral: true });
+
         const opis = interaction.options.getString('opis');
         const channelId = '1542122742768210000';
 
         const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
         if (!channel) {
-            return interaction.reply({ 
-                content: '# <a:dot:1543969325155745812> Błąd\n<:arrow:1543977081233342494> Nie znaleziono kanału aktywności.', 
-                ephemeral: true 
+            return interaction.editReply({ 
+                content: '# <a:dot:1543969325155745812> Błąd\n<:arrow:1543977081233342494> Nie znaleziono kanału aktywności.' 
             });
         }
 
@@ -107,7 +109,7 @@ module.exports = {
             descriptionText += `\n\n### <:arrow:1543977081233342494> Opis: ${opis}`;
         }
 
-    const embed = new EmbedBuilder()
+        const embed = new EmbedBuilder()
             .setDescription(descriptionText)
             .setColor(16764416)
             .setFooter({
@@ -118,17 +120,14 @@ module.exports = {
             embeds: [embed]
         });
 
-        // Poprawiony format reakcji z użyciem nazwy i ID
         await sentMessage.react('checkmark:1543969158646206475').catch(async () => {
-            // Awaryjnie spróbuj samego ID gdyby nazwa sprawila problem
             await sentMessage.react('1543969158646206475').catch(() => {});
         });
 
         await saveActivityData(sentMessage.id, [], false);
 
-        return interaction.reply({ 
-            content: '# <a:dot:1543969325155745812> Sukces\n<:arrow:1543977081233342494> Utworzono wiadomość aktywności na kanale <#' + channelId + '>.', 
-            ephemeral: true 
+        return interaction.editReply({ 
+            content: '# <a:dot:1543969325155745812> Sukces\n<:arrow:1543977081233342494> Utworzono wiadomość aktywności na kanale <#' + channelId + '>.' 
         });
     },
 
