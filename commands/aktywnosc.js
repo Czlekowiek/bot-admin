@@ -3,19 +3,13 @@ const { getDb } = require('../utils/database');
 
 async function getActivityData(messageId) {
     const db = getDb();
-    if (!db) {
-        console.warn('⚠️ [Aktywność] MongoDB nie jest jeszcze połączone!');
-        return null;
-    }
+    if (!db) return null;
     return await db.collection('activity_checks').findOne({ messageId });
 }
 
 async function saveActivityData(messageId, usersList, locked) {
     const db = getDb();
-    if (!db) {
-        console.warn('⚠️ [Aktywność] MongoDB nie jest połączone - nie można zapisać danych!');
-        return;
-    }
+    if (!db) return;
     await db.collection('activity_checks').updateOne(
         { messageId },
         { $set: { usersList, locked, updatedAt: new Date() } },
@@ -81,17 +75,14 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction) {
-        // Natychmiastowe odroczenie odpowiedzi zapobiegające błędowi "Aplikacja nie reaguje"
         await interaction.deferReply({ ephemeral: true });
 
         const opis = interaction.options.getString('opis');
-        const channelId = '1542122742768210000';
+        const targetChannelId = '1542122742768210000';
 
-        const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
+        let channel = await interaction.guild.channels.fetch(targetChannelId).catch(() => null);
         if (!channel) {
-            return interaction.editReply({ 
-                content: '# <a:dot:1543969325155745812> Błąd\n<:arrow:1543977081233342494> Nie znaleziono kanału aktywności.' 
-            });
+            channel = interaction.channel;
         }
 
         const now = new Date();
@@ -116,18 +107,18 @@ module.exports = {
                 text: `Stworzone przez @czlekowiek • Data: ${formattedTime}`
             });
 
+        // Wysłanie wiadomości z pingiem @everyone oraz embedem
         const sentMessage = await channel.send({
+            content: '@everyone',
             embeds: [embed]
         });
 
-        await sentMessage.react('checkmark:1543969158646206475').catch(async () => {
-            await sentMessage.react('1543969158646206475').catch(() => {});
-        });
+        await sentMessage.react('1543969158646206475').catch(() => {});
 
         await saveActivityData(sentMessage.id, [], false);
 
         return interaction.editReply({ 
-            content: '# <a:dot:1543969325155745812> Sukces\n<:arrow:1543977081233342494> Utworzono wiadomość aktywności na kanale <#' + channelId + '>.' 
+            content: '# <a:dot:1543969325155745812> Sukces\n<:arrow:1543977081233342494> Utworzono wiadomość aktywności na kanale <#' + channel.id + '>.' 
         });
     },
 
