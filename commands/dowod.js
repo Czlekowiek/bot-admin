@@ -28,9 +28,13 @@ async function sendLog(client, content) {
 async function sendDm(client, userId, content) {
     try {
         const user = await client.users.fetch(userId).catch(() => null);
-        if (user) await user.send({ content }).catch(() => {});
+        if (user) {
+            await user.send({ content }).catch(err => {
+                console.error(`Nie udało się wysłać DM do użytkownika ${userId}:`, err.message);
+            });
+        }
     } catch (error) {
-        console.error('Błąd wysyłania DM:', error);
+        console.error('Błąd pobierania użytkownika do DM:', error);
     }
 }
 
@@ -120,7 +124,7 @@ module.exports = {
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_imie').setLabel('Imię i Nazwisko').setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_data').setLabel('Data urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_miejsce').setLabel('Miejsce urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
-                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_plec').setLabel('Płeć (M / K)').setStyle(TextInputStyle.Short).setRequired(true)),
+                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_plec').setLabel('Płeć (M / K)').setStyle(TextInputStyle.Short).setMinLength(1).setMaxLength(1).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_roblox').setLabel('Nick Roblox').setStyle(TextInputStyle.Short).setRequired(true))
                 );
                 await interaction.showModal(modal);
@@ -166,7 +170,7 @@ module.exports = {
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_imie').setLabel('Imię i Nazwisko').setValue(dowod.imieNazwisko).setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_data').setLabel('Data urodzenia').setValue(dowod.dataUrodzenia).setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_miejsce').setLabel('Miejsce urodzenia').setValue(dowod.miejsceUrodzenia).setStyle(TextInputStyle.Short).setRequired(true)),
-                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_plec').setLabel('Płeć (M / K)').setValue(dowod.plec).setStyle(TextInputStyle.Short).setRequired(true)),
+                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_plec').setLabel('Płeć (M / K)').setValue(dowod.plec).setStyle(TextInputStyle.Short).setMinLength(1).setMaxLength(1).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_roblox').setLabel('Nick Roblox').setValue(dowod.nickRoblox).setStyle(TextInputStyle.Short).setRequired(true))
                 );
                 await interaction.showModal(modal);
@@ -236,7 +240,7 @@ module.exports = {
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('w_imie').setLabel('Imię i Nazwisko').setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('w_data').setLabel('Data urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('w_miejsce').setLabel('Miejsce urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
-                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('w_plec').setLabel('Płeć (M / K)').setStyle(TextInputStyle.Short).setRequired(true))
+                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('w_plec').setLabel('Płeć (M / K)').setStyle(TextInputStyle.Short).setMinLength(1).setMaxLength(1).setRequired(true))
                 );
                 await interaction.showModal(modal);
                 return true;
@@ -248,6 +252,24 @@ module.exports = {
             const actionType = parts[1]; 
             const subAction = parts[2]; 
             const targetId = parts.slice(3).join('_');
+
+            // Jeśli administrator klika ODRZUĆ -> Otwórz modal z pytaniem o powód
+            if (actionType === 'odrzuc') {
+                const modal = new ModalBuilder()
+                    .setCustomId(`modal_odrzuc_powod_${subAction}_${targetId}_${interaction.message.id}`)
+                    .setTitle('Powód odrzucenia wniosku');
+
+                const powodInput = new TextInputBuilder()
+                    .setCustomId('odrzuc_powod')
+                    .setLabel('Podaj powód odrzucenia')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setPlaceholder('Np. Niepoprawna data urodzenia, nieczytelny nick...')
+                    .setRequired(true);
+
+                modal.addComponents(new ActionRowBuilder().addComponents(powodInput));
+                await interaction.showModal(modal);
+                return true;
+            }
 
             if (!interaction.deferred && !interaction.replied) {
                 await interaction.deferReply({ ephemeral: true });
@@ -379,7 +401,6 @@ module.exports = {
                         }
                     }
 
-                    // Dwa embedy w jednej wiadomości logów
                     const oldEmbed = new EmbedBuilder()
                         .setTitle('🪪 Dowód przed edycją')
                         .setColor(0x000000)
@@ -411,16 +432,6 @@ module.exports = {
                     await sendDm(interaction.client, userId, '# <a:checkmark:1543969158646206475> Edycja zatwierdzona\n<:arrow:1543977081233342494> Twoja prośba o edycję danych dowodu została zaakceptowana.');
                     await interaction.editReply({ content: 'Zatwierdzono edycję dowodu.' });
                 }
-
-            } else if (actionType === 'odrzuc') {
-                if (db) await db.collection('wnioski_dowody').deleteOne({ messageId: interaction.message.id });
-                if (interaction.message.embeds.length > 0) {
-                    const origEmbed = EmbedBuilder.from(interaction.message.embeds[0])
-                        .setColor(0xed4245)
-                        .setTitle('❌ Wniosek / Prośba - ODRZUCONY');
-                    await interaction.message.edit({ embeds: [origEmbed], components: [] }).catch(() => {});
-                }
-                await interaction.editReply({ content: 'Odrzucono pomyślnie.' });
             }
 
             return true;
@@ -437,6 +448,51 @@ module.exports = {
     setupEvents(client) {
         client.on('interactionCreate', async interaction => {
             if (!interaction.isModalSubmit()) return;
+
+            // OBSŁUGA ODRZUCENIA Z POWODEM
+            if (interaction.customId.startsWith('modal_odrzuc_powod_')) {
+                await interaction.deferReply({ ephemeral: true });
+                const parts = interaction.customId.split('_');
+                const subAction = parts[3];
+                const targetId = parts[4];
+                const logMessageId = parts[5];
+
+                const powod = interaction.fields.getTextInputValue('odrzuc_powod').trim();
+                const db = getDb();
+                
+                const messageId = subAction === 'usun' || subAction === 'edycja' || subAction === 'stworz' ? targetId : subAction;
+                let wniosek = localWnioskiCache.get(messageId);
+                if (!wniosek && db) {
+                    const found = await db.collection('wnioski_dowody').findOne({ messageId });
+                    if (found) wniosek = found.dane;
+                }
+
+                const targetUserId = wniosek ? wniosek.userId : (subAction === 'usun' ? targetId.split('_')[0] : null);
+
+                if (db) await db.collection('wnioski_dowody').deleteOne({ messageId: logMessageId });
+
+                const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+                if (channel) {
+                    const msg = await channel.messages.fetch(logMessageId).catch(() => null);
+                    if (msg && msg.embeds.length > 0) {
+                        const origEmbed = EmbedBuilder.from(msg.embeds[0])
+                            .setColor(0xed4245)
+                            .setTitle('❌ Wniosek / Prośba - ODRZUCONY')
+                            .addFields(
+                                { name: 'Odrzucił', value: interaction.user.tag, inline: true },
+                                { name: 'Powód odrzucenia', value: powod, inline: false }
+                            );
+                        await msg.edit({ embeds: [origEmbed], components: [] }).catch(() => {});
+                    }
+                }
+
+                if (targetUserId) {
+                    await sendDm(client, targetUserId, `# <a:redtick:1543991522192527450> Wniosek odrzucony\n<:arrow:1543977081233342494> Twój wniosek/prośba o dowód został odrzucony przez administrację.\n<:arrow:1543977081233342494> **Powód:** ${powod}`);
+                }
+
+                await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Pomyślnie odrzucono wniosek i wysłano powód na PV.' });
+                return;
+            }
 
             // 1. Złożenie wniosku
             if (interaction.customId === 'modal_dowod_skladanie') {
@@ -495,6 +551,7 @@ module.exports = {
                 );
                 await sentMsg.edit({ components: [updatedRow] });
 
+                await sendDm(client, interaction.user.id, '# <a:checkmark:1543969158646206475> Wniosek wysłany\n<:arrow:1543977081233342494> Twój wniosek o dowód tożsamości został wysłany do weryfikacji!');
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Wniosek został wysłany do weryfikacji!' });
             }
 
@@ -612,7 +669,7 @@ module.exports = {
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Ręcznie utworzono dowód.' });
             }
 
-            // 5. Admin: Edycja po zatwierdzeniu modala edycji przez admina
+            // 5. Admin: Edycja bezpośrednia
             if (interaction.customId.startsWith('modal_admin_edytuj_zapisz_')) {
                 await interaction.deferReply({ ephemeral: true });
                 const userId = interaction.customId.replace('modal_admin_edytuj_zapisz_', '');
@@ -660,11 +717,9 @@ module.exports = {
             }
         });
 
-        // Obsługa przycisków administracyjnych (Usuń / Edytuj bezpośrednio z panelu szukania)
         client.on('interactionCreate', async interaction => {
             if (!interaction.isButton()) return;
 
-            // Admin: Usuń bezpośrednio
             if (interaction.customId.startsWith('admin_zrob_usun_')) {
                 await interaction.deferReply({ ephemeral: true });
                 const userId = interaction.customId.replace('admin_zrob_usun_', '');
@@ -687,7 +742,6 @@ module.exports = {
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Usunięto dowód użytkownika.' });
             }
 
-            // Admin: Otwórz modal edycji bezpośredniej
             if (interaction.customId.startsWith('admin_zrob_edycja_')) {
                 const userId = interaction.customId.replace('admin_zrob_edycja_', '');
                 const db = getDb();
@@ -701,7 +755,7 @@ module.exports = {
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('admin_ed_imie').setLabel('Imię i Nazwisko').setValue(dowod.imieNazwisko).setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('admin_ed_data').setLabel('Data urodzenia').setValue(dowod.dataUrodzenia).setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('admin_ed_miejsce').setLabel('Miejsce urodzenia').setValue(dowod.miejsceUrodzenia).setStyle(TextInputStyle.Short).setRequired(true)),
-                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('admin_ed_plec').setLabel('Płeć (M / K)').setValue(dowod.plec).setStyle(TextInputStyle.Short).setRequired(true)),
+                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('admin_ed_plec').setLabel('Płeć (M / K)').setValue(dowod.plec).setStyle(TextInputStyle.Short).setMinLength(1).setMaxLength(1).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('admin_ed_roblox').setLabel('Nick Roblox').setValue(dowod.nickRoblox).setStyle(TextInputStyle.Short).setRequired(true))
                 );
                 await interaction.showModal(modal);
