@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
-const { Client, GatewayIntentBits, Partials, Collection, REST, Routes, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, Collection, REST, Routes } = require('discord.js');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 
 const { generateStaffEmbed } = require('./utils/sklad-administracji');
@@ -25,7 +25,7 @@ if (uri) {
     });
 
     mongoClient.connect().then(() => {
-        db = mongoClient.db('bot_database'); // Możesz zmienić nazwę bazy danych, jeśli wolisz inną
+        db = mongoClient.db('bot_database');
         console.log('Połączono pomyślnie z bazą danych MongoDB!');
     }).catch(err => {
         console.error('Błąd podczas łączenia z MongoDB:', err);
@@ -33,9 +33,6 @@ if (uri) {
 } else {
     console.warn('Brak zmiennej środowiskowej MONGO_URI! Baza danych nie została zainicjalizowana.');
 }
-
-// Eksport bazy danych do użycia w komendach (np. module.exports.db lub przez client)
-module.exports = { client: null, getDb: () => db };
 
 // =========================================================
 // HTTP SERVER - RENDER
@@ -61,9 +58,6 @@ const client = new Client({
     ],
     partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
-
-// Przypisanie klienta do eksportu, aby inne pliki mogły z niego korzystać
-module.exports.client = client;
 
 client.commands = new Collection();
 const commands = [];
@@ -105,7 +99,6 @@ for (const file of commandFiles) {
         client.commands.set(command.data.name, command);
         commands.push(command.data.toJSON());
     }
-    // Automatyczne podpinanie eventów z modułów (weryfikacja, dowod, aktywnosc)
     if (typeof command.setupEvents === 'function') {
         command.setupEvents(client);
     }
@@ -145,10 +138,7 @@ async function updateAdminMessage(guild) {
 client.once('ready', async () => {
     console.log(`Zalogowano jako ${client.user.tag}!`);
     setTimeout(async () => {
-        await sendLog(`Bot został uruchomiony. Zalogowano jako \`${client.user.tag}\`.`);
-        if (modifiedCommands.length > 0) {
-            await sendLog(`Wykryto zmianę kodu w komendach: ${modifiedCommands.map(c => `\`/${c}\``).join(', ')}`);
-        }
+        await sendLog(`# <a:dot:1543969325155745812> **Bot został uruchomiony**\n<:arrow:1543977081233342494> Zalogowano jako: \`${client.user.tag}\``);
     }, 2000);
 
     const guild = client.guilds.cache.first();
@@ -158,7 +148,6 @@ client.once('ready', async () => {
             await rest.put(Routes.applicationGuildCommands(client.user.id, guild.id), { body: commands });
         } catch (error) {
             console.error(error);
-            await sendLog(`❌ **Błąd podczas rejestrowania komend:** \`${error.message}\``);
         }
         await updateAdminMessage(guild);
     }
@@ -181,90 +170,6 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 });
 
 // =========================================================
-// HISTORIA REAKCJI I TABLICA AKTYWNOŚCI
-// =========================================================
-
-const reactionHistory = new Map();
-
-async function getOrCreateUsersList(reaction) {
-    const msgId = reaction.message.id;
-    if (!reactionHistory.has(msgId)) {
-        const usersMap = await reaction.users.fetch({ limit: 100 });
-        const usersList = [];
-        for (const [userId, user] of usersMap) {
-            if (!user.bot) {
-                usersList.push(userId);
-            }
-        }
-        reactionHistory.set(msgId, usersList);
-    }
-    return reactionHistory.get(msgId);
-}
-
-client.on('messageReactionAdd', async (reaction, user) => {
-    if (user.bot) return;
-    if (reaction.partial) {
-        try { await reaction.fetch(); } catch { return; }
-    }
-    if (reaction.message.partial) {
-        try { await reaction.message.fetch(); } catch { return; }
-    }
-    if (reaction.emoji.id !== '1543969158646206475') return;
-
-    const usersList = await getOrCreateUsersList(reaction);
-    if (!usersList.includes(user.id)) {
-        usersList.push(user.id);
-    }
-    await updateActivityBoard(reaction.message, usersList);
-});
-
-client.on('messageReactionRemove', async (reaction, user) => {
-    if (user.bot) return;
-    if (reaction.partial) {
-        try { await reaction.fetch(); } catch { return; }
-    }
-    if (reaction.message.partial) {
-        try { await reaction.message.fetch(); } catch { return; }
-    }
-    if (reaction.emoji.id !== '1543969158646206475') return;
-
-    const usersList = await getOrCreateUsersList(reaction);
-    const index = usersList.indexOf(user.id);
-    if (index > -1) {
-        usersList.splice(index, 1);
-    }
-    await updateActivityBoard(reaction.message, usersList);
-});
-
-async function updateActivityBoard(message, usersList) {
-    if (!message.embeds.length) return;
-
-    const embed = message.embeds[0];
-    const description = embed.description;
-    const opisMatch = description.split(/### <:arrow:1543977081233342494> Opis: /);
-    const activityDescription = opisMatch[1] ? opisMatch[1] : null;
-
-    const top1 = usersList[0] ? `<@${usersList[0]}>` : 'Brak';
-    const top2 = usersList[1] ? `<@${usersList[1]}>` : 'Brak';
-    const top3 = usersList[2] ? `<@${usersList[2]}>` : 'Brak';
-
-    let newDescription =
-        `# <a:checkmark:1543969158646206475> Aktywność check\n` +
-        `## <a:top1:1548673656761352304> ${top1}\n` +
-        `## <a:top2:1548673747983011891> ${top2}\n` +
-        `## <a:top3:1548673801104138322> ${top3}\n\n` +
-        `## <a:dot:1543969325155745812> Zareaguj emotką "<a:checkmark:1543969158646206475>" poniżej aby zaznaczyć aktywność.`;
-
-    if (activityDescription) {
-        newDescription += `\n\n### <:arrow:1543977081233342494> Opis: ${activityDescription}`;
-    }
-
-    const updatedEmbed = EmbedBuilder.from(embed).setDescription(newDescription);
-
-    await message.edit({ embeds: [updatedEmbed] });
-}
-
-// =========================================================
 // UNIWERSALNA OBSŁUGA KOMEND SLASH
 // =========================================================
 
@@ -274,17 +179,26 @@ client.on('interactionCreate', async interaction => {
     const command = client.commands.get(interaction.commandName);
     if (!command || typeof command.execute !== 'function') return;
 
-    await sendLog(`Użytkownik ${interaction.user.tag} użył komendy \`/${interaction.commandName}\` na kanale <#${interaction.channelId}>.`);
+    await sendLog(`# <a:dot:1543969325155745812> **Użycie komendy**\n<:arrow:1543977081233342494> Użytkownik **${interaction.user.tag}** (\`${interaction.user.id}\`) użył \`/${interaction.commandName}\` na kanale <#${interaction.channelId}>.`);
+    
     try {
         await command.execute(interaction);
     } catch (error) {
         console.error(error);
-        await sendLog(`❌ **Błąd podczas wykonywania komendy** \`/${interaction.commandName}\` przez ${interaction.user.tag}: \`${error.message}\``);
         const replyOptions = { content: 'Wystąpił błąd podczas wykonywania tej komendy!', ephemeral: true };
         if (interaction.replied || interaction.deferred) await interaction.followUp(replyOptions);
         else await interaction.reply(replyOptions);
     }
 });
+
+// =========================================================
+// EKSPORT KLIENTA ORAZ BAZY DANYCH
+// =========================================================
+
+module.exports = {
+    client,
+    getDb: () => db
+};
 
 // =========================================================
 // ZAMYKANIE PROCESU I LOGOWANIE
