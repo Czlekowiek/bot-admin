@@ -149,7 +149,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 });
 
 // =========================================================
-// UNIWERSALNA OBSŁUGA KOMEND SLASH
+// UNIWERSALNA OBSŁUGA KOMEND SLASH (Z AUTOMATYCZNYM ZABEZPIECZENIEM TIMEOUTU)
 // =========================================================
 
 client.on('interactionCreate', async interaction => {
@@ -158,16 +158,33 @@ client.on('interactionCreate', async interaction => {
     const command = client.commands.get(interaction.commandName);
     if (!command || typeof command.execute !== 'function') return;
 
-    // Wysyłamy log w tle, aby nie opóźniać odpowiedzi na interakcję Discorda
+    // Wysyłamy log w tle, całkowicie nie blokując wykonania
     sendLog(`# <a:dot:1543969325155745812> **Użycie komendy**\n<:arrow:1543977081233342494> Użytkownik **${interaction.user.tag}** (\`${interaction.user.id}\`) użył \`/${interaction.commandName}\` na kanale <#${interaction.channelId}>.`).catch(() => {});
     
+    // Natychmiastowe odroczenie zapobiegające błędu "Aplikacja nie reaguje"
+    try {
+        await interaction.deferReply({ ephemeral: true });
+    } catch (e) {}
+
+    // Proxy do obsługi odpowiedzi, aby komendy używające interaction.reply działały bez zmian
+    const originalReply = interaction.reply.bind(interaction);
+    interaction.reply = async (options) => {
+        if (interaction.deferred || interaction.replied) {
+            return await interaction.editReply(options);
+        }
+        return await originalReply(options);
+    };
+
     try {
         await command.execute(interaction);
     } catch (error) {
         console.error(error);
-        const replyOptions = { content: 'Wystąpił błąd podczas wykonywania tej komendy!', ephemeral: true };
-        if (interaction.replied || interaction.deferred) await interaction.followUp(replyOptions);
-        else await interaction.reply(replyOptions);
+        const replyOptions = { content: 'Wystąpił błąd podczas wykonywania tej komendy!' };
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp(replyOptions).catch(() => {});
+        } else {
+            await originalReply(replyOptions).catch(() => {});
+        }
     }
 });
 
