@@ -65,11 +65,18 @@ async function updateActivityBoard(message, usersList) {
     const embed = message.embeds[0];
     const description = embed.description || '';
     
-    const opisMatch = description.split(/### <:arrow:1543977081233342494> Opis: /);
-    const activityDescription = opisMatch[1] ? opisMatch[1].split('\n## <a:dot:')[0] : null;
+    // Dynamiczne wyciąganie dnia oraz opisu niezależnie od ich kolejności
+    const parts = description.split('\n\n## <a:dot:1543969325155745812> ');
+    let dzienEmotki = null;
+    let activityDescription = null;
 
-    const dzienMatch = description.match(/## <a:dot:1543969325155745812> Dzień ([\s\S]*?)(?=\n\n###|$)/);
-    const dzienEmotki = dzienMatch ? dzienMatch[1] : null;
+    for (let i = 1; i < parts.length; i++) {
+        if (parts[i].startsWith('Dzień ')) {
+            dzienEmotki = parts[i].replace('Dzień ', '').trim();
+        } else if (parts[i].startsWith('Opis: ')) {
+            activityDescription = parts[i].replace('Opis: ', '').trim();
+        }
+    }
 
     const top1 = usersList[0] ? `<@${usersList[0]}>` : 'Brak';
     const top2 = usersList[1] ? `<@${usersList[1]}>` : 'Brak';
@@ -87,7 +94,7 @@ async function updateActivityBoard(message, usersList) {
     }
 
     if (activityDescription) {
-        newDescription += `\n\n### <:arrow:1543977081233342494> Opis: ${activityDescription.trim()}`;
+        newDescription += `\n\n## <a:dot:1543969325155745812> Opis: ${activityDescription}`;
     }
 
     const updatedEmbed = EmbedBuilder.from(embed).setDescription(newDescription);
@@ -100,7 +107,7 @@ module.exports = {
         .setDescription('Tworzy wiadomość o aktywność check')
         .addStringOption(option =>
             option.setName('opis')
-                .setDescription('Opis (opcjonalnie)')
+                .setDescription('(opcjonalnie)')
                 .setRequired(false))
         .addStringOption(option =>
             option.setName('dzien')
@@ -137,7 +144,7 @@ module.exports = {
         }
 
         if (opis) {
-            descriptionText += `\n\n### <:arrow:1543977081233342494> Opis: ${opis}`;
+            descriptionText += `\n\n## <a:dot:1543969325155745812> Opis: ${opis}`;
         }
 
         const embed = new EmbedBuilder()
