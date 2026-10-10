@@ -9,11 +9,6 @@ const { sendWelcomeMessage } = require('./utils/welcome');
 const { sendLeaveMessage } = require('./utils/bye');
 
 // =========================================================
-// MONGODB CONNECTION
-// =========================================================
-connectDB();
-
-// =========================================================
 // HTTP SERVER - RENDER
 // =========================================================
 
@@ -149,7 +144,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 });
 
 // =========================================================
-// UNIWERSALNA OBSŁUGA KOMEND SLASH (Z AUTOMATYCZNYM ZABEZPIECZENIEM TIMEOUTU)
+// UNIWERSALNA OBSŁUGA KOMEND SLASH (Z BEZPIECZNYM DEFEREM)
 // =========================================================
 
 client.on('interactionCreate', async interaction => {
@@ -158,7 +153,6 @@ client.on('interactionCreate', async interaction => {
     const command = client.commands.get(interaction.commandName);
     if (!command || typeof command.execute !== 'function') return;
 
-    // Wysyłamy log w tle, całkowicie nie blokując wykonania
     sendLog(`# <a:dot:1543969325155745812> **Użycie komendy**\n<:arrow:1543977081233342494> Użytkownik **${interaction.user.tag}** (\`${interaction.user.id}\`) użył \`/${interaction.commandName}\` na kanale <#${interaction.channelId}>.`).catch(() => {});
     
     // Natychmiastowe odroczenie zapobiegające błędu "Aplikacja nie reaguje"
@@ -166,39 +160,44 @@ client.on('interactionCreate', async interaction => {
         await interaction.deferReply({ ephemeral: true });
     } catch (e) {}
 
-    // Proxy do obsługi odpowiedzi, aby komendy używające interaction.reply działały bez zmian
+    // Proxy dla metod odpowiedzi, aby komendy używające interaction.reply działały poprawnie
     const originalReply = interaction.reply.bind(interaction);
     interaction.reply = async (options) => {
-        if (interaction.deferred || interaction.replied) {
-            return await interaction.editReply(options);
-        }
-        return await originalReply(options);
+        return await interaction.editReply(options);
+    };
+    interaction.deferReply = async () => {
+        return interaction;
     };
 
     try {
         await command.execute(interaction);
     } catch (error) {
-        console.error(error);
-        const replyOptions = { content: 'Wystąpił błąd podczas wykonywania tej komendy!' };
-        if (interaction.replied || interaction.deferred) {
-            await interaction.followUp(replyOptions).catch(() => {});
-        } else {
-            await originalReply(replyOptions).catch(() => {});
-        }
+        console.error(`Błąd w komendze ${interaction.commandName}:`, error);
+        try {
+            await interaction.editReply({ content: 'Wystąpił błąd podczas wykonywania tej komendy!' });
+        } catch (e) {}
     }
 });
 
 // =========================================================
-// EKSPORT KLIENTA
+// START APLIKACJI (DB + LOGIN)
 // =========================================================
 
-module.exports = { client };
+async function startBot() {
+    try {
+        await connectDB();
+        await client.login(process.env.DISCORD_TOKEN);
+    } catch (error) {
+        console.error('Nie udało się uruchomić bota:', error);
+        process.exit(1);
+    }
+}
+
+startBot();
 
 // =========================================================
-// ZAMYKANIE PROCESU I LOGOWANIE
+// ZAMYKANIE PROCESU
 // =========================================================
 
 process.on('SIGINT', () => { process.exit(0); });
 process.on('SIGTERM', () => { process.exit(0); });
-
-client.login(process.env.DISCORD_TOKEN);

@@ -1,27 +1,32 @@
 const { MongoClient, ServerApiVersion } = require('mongodb');
 
 const uri = process.env.MONGO_URI;
+let clientInstance = null;
 let db = null;
 
 async function connectDB() {
-    if (uri) {
-        const mongoClient = new MongoClient(uri, {
-            serverApi: {
-                version: ServerApiVersion.v1,
-                strict: true,
-                deprecationErrors: true,
-            }
-        });
+    if (!uri) {
+        console.warn('Brak zmiennej środowiskowej MONGO_URI!');
+        return null;
+    }
+    if (db) return db;
 
-        try {
-            await mongoClient.connect();
-            db = mongoClient.db('bot_database');
-            console.log('Połączono pomyślnie z bazą danych MongoDB!');
-        } catch (err) {
-            console.error('Błąd podczas łączenia z MongoDB:', err);
+    clientInstance = new MongoClient(uri, {
+        serverApi: {
+            version: ServerApiVersion.v1,
+            strict: true,
+            deprecationErrors: true,
         }
-    } else {
-        console.warn('Brak zmiennej środowiskowej MONGO_URI! Baza danych nie została zainicjalizowana.');
+    });
+
+    try {
+        await clientInstance.connect();
+        db = clientInstance.db('bot_database');
+        console.log('Połączono pomyślnie z bazą danych MongoDB!');
+        return db;
+    } catch (err) {
+        console.error('Błąd podczas łączenia z MongoDB:', err);
+        throw err;
     }
 }
 
