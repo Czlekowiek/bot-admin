@@ -107,7 +107,7 @@ module.exports = {
             descriptionText += `\n\n### <:arrow:1543977081233342494> Opis: ${opis}`;
         }
 
-        const embed = new EmbedBuilder()
+    const embed = new EmbedBuilder()
             .setDescription(descriptionText)
             .setColor(16764416)
             .setFooter({
@@ -118,7 +118,11 @@ module.exports = {
             embeds: [embed]
         });
 
-        await sentMessage.react('1543969158646206475');
+        // Poprawiony format reakcji z użyciem nazwy i ID
+        await sentMessage.react('checkmark:1543969158646206475').catch(async () => {
+            // Awaryjnie spróbuj samego ID gdyby nazwa sprawila problem
+            await sentMessage.react('1543969158646206475').catch(() => {});
+        });
 
         await saveActivityData(sentMessage.id, [], false);
 
@@ -132,10 +136,10 @@ module.exports = {
         async function handleReactionChange(reaction, user, isAdd) {
             if (user.bot) return;
             if (reaction.partial) {
-                try { await reaction.fetch(); } catch (e) { console.error('Błąd pobierania reakcji:', e); return; }
+                try { await reaction.fetch(); } catch (e) { return; }
             }
             if (reaction.message.partial) {
-                try { await reaction.message.fetch(); } catch (e) { console.error('Błąd pobierania wiadomości:', e); return; }
+                try { await reaction.message.fetch(); } catch (e) { return; }
             }
             if (reaction.emoji.id !== '1543969158646206475') return;
 
