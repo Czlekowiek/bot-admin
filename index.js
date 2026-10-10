@@ -63,7 +63,6 @@ const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.existsSync(commandsPath) ? fs.readdirSync(commandsPath).filter(file => file.endsWith('.js')) : [];
 const currentVersions = {};
 
-// POPRAWKA 1: try/catch przy ładowaniu każdej komendy — crash przy błędnym pliku
 for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
     const stats = fs.statSync(filePath);
@@ -77,14 +76,11 @@ for (const file of commandFiles) {
         } else {
             console.warn(`[OSTRZEŻENIE] Komenda ${file} nie ma wymaganych pól 'data' lub 'execute'.`);
         }
-        // POPRAWKA 2: setupEvents opóźnione do eventu 'ready' — żeby bot był gotowy
-        // (przeniesione niżej, do client.once('ready'))
     } catch (error) {
         console.error(`[BŁĄD] Nie udało się załadować komendy ${file}:`, error);
     }
 }
 
-// Zapisz wersje plików komend
 if (commandFiles.length > 0) {
     fs.writeFileSync(versionsFilePath, JSON.stringify(currentVersions, null, 2));
 }
@@ -119,11 +115,10 @@ async function updateAdminMessage(guild) {
 client.once('ready', async () => {
     console.log(`Zalogowano jako ${client.user.tag}!`);
 
-    // POPRAWKA 2: setupEvents wywołane tutaj — bot jest już gotowy
     for (const file of commandFiles) {
         try {
             const filePath = path.join(commandsPath, file);
-            const command = require(filePath); // Node cachuje require, nie ładuje ponownie
+            const command = require(filePath);
             if (typeof command.setupEvents === 'function') {
                 command.setupEvents(client);
             }
@@ -132,7 +127,6 @@ client.once('ready', async () => {
         }
     }
 
-    // POPRAWKA 3: sendLog bez arbitralnego setTimeout — czekamy aż fetch kanału się powiedzie
     try {
         const logChannel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
         if (logChannel) {
@@ -178,25 +172,38 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 });
 
 // =========================================================
-// UNIWERSALNA OBSŁUGA KOMEND SLASH
+// UNIWERSALNA OBSŁUGA INTERAKCJI (KOMENDY I PRZYCISKI)
 // =========================================================
 
 client.on('interactionCreate', async interaction => {
-    if (!interaction.isChatInputCommand()) return;
+    // 1. Obsługa komend Slash
+    if (interaction.isChatInputCommand()) {
+        const command = client.commands.get(interaction.commandName);
+        if (!command || typeof command.execute !== 'function') return;
 
-    const command = client.commands.get(interaction.commandName);
-    if (!command || typeof command.execute !== 'function') return;
+        sendLog(`# <a:dot:1543969325155745812> **Użycie komendy**\n<:arrow:1543977081233342494> Użytkownik **${interaction.user.tag}** (\`${interaction.user.id}\`) użył \`/${interaction.commandName}\` na kanale <#${interaction.channelId}>.`).catch(() => {});
 
-    // Log w tle, nie blokuje bota
-    sendLog(`# <a:dot:1543969325155745812> **Użycie komendy**\n<:arrow:1543977081233342494> Użytkownik **${interaction.user.tag}** (\`${interaction.user.id}\`) użył \`/${interaction.commandName}\` na kanale <#${interaction.channelId}>.`).catch(() => {});
-
-    try {
-        await command.execute(interaction);
-    } catch (error) {
-        console.error(`Błąd podczas wykonywania komendy ${interaction.commandName}:`, error);
-        const replyOptions = { content: 'Wystąpił błąd podczas wykonywania tej komendy!', ephemeral: true };
-        if (interaction.replied || interaction.deferred) await interaction.followUp(replyOptions).catch(() => {});
-        else await interaction.reply(replyOptions).catch(() => {});
+        try {
+            await command.execute(interaction);
+        } catch (error) {
+            console.error(`Błąd podczas wykonywania komendy ${interaction.commandName}:`, error);
+            const replyOptions = { content: 'Wystąpił błąd podczas wykonywania tej komendy!', ephemeral: true };
+            if (interaction.replied || interaction.deferred) await interaction.followUp(replyOptions).catch(() => {});
+            else await interaction.reply(replyOptions).catch(() => {});
+        }
+    } 
+    // 2. Obsługa przycisków (Button Components)
+    else if (interaction.isButton()) {
+        for (const [name, command] of client.commands) {
+            if (typeof command.handleButton === 'function') {
+                try {
+                    const handled = await command.handleButton(interaction);
+                    if (handled) break; // Jeśli moduł obsłużył przycisk, przerywamy pętlę
+                } catch (error) {
+                    console.error(`Błąd podczas obsługi przycisku w komendzie ${name}:`, error);
+                }
+            }
+        }
     }
 });
 
@@ -213,7 +220,6 @@ module.exports = { client };
 process.on('SIGINT', () => { process.exit(0); });
 process.on('SIGTERM', () => { process.exit(0); });
 
-// POPRAWKA 4: obsługa błędu logowania — token nieprawidłowy / brak zmiennej środowiskowej
 client.login(process.env.DISCORD_TOKEN).catch(err => {
     console.error('Nie można zalogować bota — sprawdź DISCORD_TOKEN:', err);
     process.exit(1);
