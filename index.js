@@ -25,7 +25,7 @@ if (uri) {
     });
 
     mongoClient.connect().then(() => {
-        db = mongoClient.db('bot_database'); // Możesz zmienić nazwę bazy danych, jeśli wolisz inną
+        db = mongoClient.db('bot_database');
         console.log('Połączono pomyślnie z bazą danych MongoDB!');
     }).catch(err => {
         console.error('Błąd podczas łączenia z MongoDB:', err);
@@ -33,9 +33,6 @@ if (uri) {
 } else {
     console.warn('Brak zmiennej środowiskowej MONGO_URI! Baza danych nie została zainicjalizowana.');
 }
-
-// Eksport bazy danych do użycia w komendach (np. module.exports.db lub przez client)
-module.exports = { client: null, getDb: () => db };
 
 // =========================================================
 // HTTP SERVER - RENDER
@@ -61,9 +58,6 @@ const client = new Client({
     ],
     partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
-
-// Przypisanie klienta do eksportu, aby inne pliki mogły z niego korzystać
-module.exports.client = client;
 
 client.commands = new Collection();
 const commands = [];
@@ -105,7 +99,6 @@ for (const file of commandFiles) {
         client.commands.set(command.data.name, command);
         commands.push(command.data.toJSON());
     }
-    // Automatyczne podpinanie eventów z modułów (weryfikacja, dowod, aktywnosc)
     if (typeof command.setupEvents === 'function') {
         command.setupEvents(client);
     }
@@ -285,6 +278,15 @@ client.on('interactionCreate', async interaction => {
         else await interaction.reply(replyOptions);
     }
 });
+
+// =========================================================
+// EKSPORT KLIENTA ORAZ BAZY DANYCH
+// =========================================================
+
+module.exports = {
+    client,
+    getDb: () => db
+};
 
 // =========================================================
 // ZAMYKANIE PROCESU I LOGOWANIE
