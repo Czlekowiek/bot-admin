@@ -25,7 +25,6 @@ async function getOrInitUsersList(reaction) {
         return { usersList: dbData.usersList, locked: dbData.locked };
     }
 
-    // Awaryjne pobranie z Discorda, jeśli brak w bazie
     const usersMap = await reaction.users.fetch({ limit: 100 });
     const usersList = [];
     for (const [userId, user] of usersMap) {
@@ -109,18 +108,17 @@ module.exports = {
                 text: `Stworzone przez @czlekowiek • Data: ${formattedTime}`
             });
 
+        // Wysłanie wiadomości bez pingu everyone/here
         const sentMessage = await channel.send({
-            content: '@everyone @here',
             embeds: [embed]
         });
 
         await sentMessage.react('1543969158646206475');
 
-        // Inicjalizacja pustej listy w bazie danych dla nowej wiadomości
         await saveActivityData(sentMessage.id, [], false);
 
         return interaction.reply({ 
-            content: '# <a:dot:1543969325155745812> Sukces\n<:arrow:1543977081233342494> Utworzono wiadomość aktywności na kanale <#${channelId}>.', 
+            content: '# <a:dot:1543969325155745812> Sukces\n<:arrow:1543977081233342494> Utworzono wiadomość aktywności na kanale <#' + channelId + '>.', 
             ephemeral: true 
         });
     },
@@ -139,7 +137,7 @@ module.exports = {
             const message = reaction.message;
             let { usersList, locked } = await getOrInitUsersList(reaction);
 
-            if (locked) return; // Jeśli top 3 jest pełne i zablokowane, ignorujemy zmiany
+            if (locked) return;
 
             const index = usersList.indexOf(user.id);
             if (isAdd) {
@@ -152,7 +150,6 @@ module.exports = {
                 }
             }
 
-            // Sprawdzamy czy osiągnięto pełną tabelkę (3 osoby)
             if (usersList.length >= 3) {
                 locked = true;
             }
