@@ -56,8 +56,7 @@ module.exports = {
                 .setDescription('Wysyła publiczny panel zarządzania dowodem dla użytkowników.'))
         .addSubcommand(sub =>
             sub.setName('admin-panel')
-                .setDescription('Wysyła panel administracyjny do zarządzania dowodami.')
-                .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)),
+                .setDescription('Wysyła panel administracyjny do zarządzania dowodami.')),
 
     async execute(interaction) {
         try {
@@ -79,6 +78,10 @@ module.exports = {
                 await interaction.reply({ embeds: [embed], components: [row] });
 
             } else if (subcommand === 'admin-panel') {
+                if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
+                    return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie masz uprawnień do tej komendy.', ephemeral: true });
+                }
+
                 const embed = new EmbedBuilder()
                     .setTitle('🛡️ Panel Administracyjny Dowodów')
                     .setDescription('Wybierz akcję administracyjną, aby zarządzać dowodami graczy.')
@@ -103,7 +106,6 @@ module.exports = {
         try {
             const customId = interaction.customId;
 
-            // 1. ZŁÓŻ WNIOSEK (Modal)
             if (customId === 'dowod_stworz') {
                 const db = getDb();
                 if (db) {
@@ -125,7 +127,6 @@ module.exports = {
                 return true;
             }
 
-            // 2. ZOBACZ DOWÓD
             if (customId === 'dowod_zobacz') {
                 await interaction.deferReply({ ephemeral: true });
                 const db = getDb();
@@ -151,7 +152,6 @@ module.exports = {
                 return true;
             }
 
-            // 3. EDYTUJ DOWÓD (Modal startowy)
             if (customId === 'dowod_edytuj_start') {
                 const db = getDb();
                 if (!db) return interaction.reply({ content: 'Błąd bazy danych.', ephemeral: true });
@@ -173,7 +173,6 @@ module.exports = {
                 return true;
             }
 
-            // 4. USUŃ DOWÓD (Prośba do administracji)
             if (customId === 'dowod_usun_start') {
                 await interaction.deferReply({ ephemeral: true });
                 const db = getDb();
@@ -216,7 +215,6 @@ module.exports = {
                 return true;
             }
 
-            // 5. ADMIN: SZUKAJ DOWODU
             if (customId === 'admin_dowod_szukaj') {
                 const modal = new ModalBuilder().setCustomId('modal_admin_szukaj').setTitle('Znajdź Dowód Użytkownika');
                 modal.addComponents(
@@ -226,7 +224,6 @@ module.exports = {
                 return true;
             }
 
-            // 6. ADMIN: RĘCZNA WERYFIKACJA (Modal)
             if (customId === 'admin_dowod_weryfikuj') {
                 const modal = new ModalBuilder().setCustomId('modal_admin_weryfikuj').setTitle('Ręczne Utworzenie Dowodu');
                 modal.addComponents(
@@ -240,12 +237,11 @@ module.exports = {
                 return true;
             }
 
-            // OBSŁUGA PRZYCISKÓW AKCEPTACJI / ODRZUCENIA WNIOSKÓW PRZEZ ADMINA
             const parts = customId.split('_');
             if (parts[0] !== 'dowod') return false;
 
-            const actionType = parts[1]; // akceptuj, odrzuc, adminusun, adminedytuj
-            const subAction = parts[2]; // stworz/usun/edycja lub ID
+            const actionType = parts[1]; 
+            const subAction = parts[2]; 
             const targetId = parts.slice(3).join('_');
 
             if (!interaction.deferred && !interaction.replied) {
@@ -271,7 +267,6 @@ module.exports = {
                         await db.collection('wnioski_dowody').deleteOne({ messageId: interaction.message.id });
                     }
 
-                    // Wysyłanie na kanał 1558466596295417996 z pingiem NAD embedem
                     const channelDowody = await interaction.client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
                     let sentDowodMsgId = null;
                     if (channelDowody) {
@@ -289,11 +284,9 @@ module.exports = {
                         const sentDMsg = await channelDowody.send({ content: `<@${userId}>`, embeds: [embedDowod] });
                         sentDowodMsgId = sentDMsg.id;
 
-                        // Zapisz ID wiadomości dowodu w bazie, aby móc ją edytować/usuwać
                         if (db) await db.collection('dowody').updateOne({ userId }, { $set: { messageId: sentDowodMsgId } });
                     }
 
-                    // Edycja embeda logów na zielono
                     if (interaction.message.embeds.length > 0) {
                         const origEmbed = EmbedBuilder.from(interaction.message.embeds[0])
                             .setColor(0x57f287)
@@ -318,7 +311,6 @@ module.exports = {
                         await db.collection('wnioski_dowody').deleteOne({ messageId: interaction.message.id });
                     }
 
-                    // Usunięcie wiadomości z kanału dowodów
                     if (stareDane && stareDane.messageId) {
                         const channelDowody = await interaction.client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
                         if (channelDowody) {
@@ -360,7 +352,6 @@ module.exports = {
                         await db.collection('wnioski_dowody').deleteOne({ messageId: interaction.message.id });
                     }
 
-                    // Edycja wiadomości dowodu na kanale dowodów + footer z datą
                     if (stareDane && stareDane.messageId) {
                         const channelDowody = await interaction.client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
                         if (channelDowody) {
@@ -383,7 +374,6 @@ module.exports = {
                         }
                     }
 
-                    // Logi: Dwa embedy w jednej wiadomości (stary czarny + nowy standardowy)
                     const oldEmbed = new EmbedBuilder()
                         .setTitle('🪪 Dowód przed edycją')
                         .setColor(0x000000)
@@ -430,7 +420,6 @@ module.exports = {
         client.on('interactionCreate', async interaction => {
             if (!interaction.isModalSubmit()) return;
 
-            // 1. SKŁADANIE WNIOSKU
             if (interaction.customId === 'modal_dowod_skladanie') {
                 await interaction.deferReply({ ephemeral: true });
                 const imieNazwisko = interaction.fields.getTextInputValue('dowod_imie').trim();
@@ -490,7 +479,6 @@ module.exports = {
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Wniosek został wysłany do weryfikacji!' });
             }
 
-            // 2. EDYCJA WNIOSEK MODAL
             if (interaction.customId === 'modal_dowod_edycja') {
                 await interaction.deferReply({ ephemeral: true });
                 const db = getDb();
@@ -541,7 +529,6 @@ module.exports = {
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Wysłano prośbę o edycję do administracji.' });
             }
 
-            // 3. ADMIN: WYSZUKIWANIE DOWODU
             if (interaction.customId === 'modal_admin_szukaj') {
                 await interaction.deferReply({ ephemeral: true });
                 const fraza = interaction.fields.getTextInputValue('szukaj_fraza').trim().toLowerCase();
@@ -578,7 +565,6 @@ module.exports = {
                 await interaction.editReply({ embeds: [embed], components: [row] });
             }
 
-            // 4. ADMIN: RĘCZNE UTWORZENIE
             if (interaction.customId === 'modal_admin_weryfikuj') {
                 await interaction.deferReply({ ephemeral: true });
                 const userId = interaction.fields.getTextInputValue('w_id').trim();
@@ -601,7 +587,6 @@ module.exports = {
             }
         });
 
-        // Obsługa przycisku administracyjnego usuwania wyszukanego dowodu
         client.on('interactionCreate', async interaction => {
             if (!interaction.isButton()) return;
             if (!interaction.customId.startsWith('admin_zrob_usun_')) return;
