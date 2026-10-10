@@ -113,14 +113,14 @@ module.exports = {
 
             if (customId === 'dowod_stworz') {
                 await interaction.reply({
-                    content: '# <a:dot:1543969325155745812> Wniosek\n<:arrow:1543977081233342494> Funkcja formularza jest aktywna. Prześlij swoje dane do weryfikacji.',
+                    content: '# <a:checkmark:1543969158646206475> Wniosek\n<:arrow:1543977081233342494> Funkcja formularza jest aktywna. Prześlij swoje dane do weryfikacji.',
                     ephemeral: true
                 });
-                return;
+                return true;
             }
 
             const [prefix, action, messageId] = customId.split('_');
-            if (prefix !== 'dowod') return;
+            if (prefix !== 'dowod') return false;
 
             await interaction.deferReply({ ephemeral: true });
 
@@ -134,9 +134,10 @@ module.exports = {
 
             // 2. Odporność na brak danych po restarcie bota
             if (!wniosekData || !wniosekData.dane) {
-                return interaction.editReply({
+                await interaction.editReply({
                     content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie odnaleziono danych tego wniosku w bazie danych (wniosek mógł wygasnąć lub zostać rozpatrzony po zrestartowaniu bota).'
                 });
+                return true;
             }
 
             if (action === 'akceptuj') {
@@ -193,6 +194,7 @@ module.exports = {
                     );
                 }
             }
+            return true;
         } catch (error) {
             console.error('Błąd podczas obsługi przycisku w dowod.js:', error);
             const errPayload = { 
@@ -204,6 +206,7 @@ module.exports = {
             } else {
                 await interaction.reply(errPayload).catch(console.error);
             }
+            return true;
         }
     },
 
