@@ -3,13 +3,19 @@ const { getDb } = require('../utils/database');
 
 async function getActivityData(messageId) {
     const db = getDb();
-    if (!db) return null;
+    if (!db) {
+        console.warn('⚠️ [Aktywność] MongoDB nie jest jeszcze połączone!');
+        return null;
+    }
     return await db.collection('activity_checks').findOne({ messageId });
 }
 
 async function saveActivityData(messageId, usersList, locked) {
     const db = getDb();
-    if (!db) return;
+    if (!db) {
+        console.warn('⚠️ [Aktywność] MongoDB nie jest połączone - nie można zapisać danych!');
+        return;
+    }
     await db.collection('activity_checks').updateOne(
         { messageId },
         { $set: { usersList, locked, updatedAt: new Date() } },
@@ -117,7 +123,7 @@ module.exports = {
         await saveActivityData(sentMessage.id, [], false);
 
         return interaction.reply({ 
-            content: `# <a:dot:1543969325155745812> Sukces\n<:arrow:1543977081233342494> Utworzono wiadomość aktywności na kanale <#${channelId}>.`, 
+            content: '# <a:dot:1543969325155745812> Sukces\n<:arrow:1543977081233342494> Utworzono wiadomość aktywności na kanale <#' + channelId + '>.', 
             ephemeral: true 
         });
     },
@@ -126,10 +132,10 @@ module.exports = {
         async function handleReactionChange(reaction, user, isAdd) {
             if (user.bot) return;
             if (reaction.partial) {
-                try { await reaction.fetch(); } catch { return; }
+                try { await reaction.fetch(); } catch (e) { console.error('Błąd pobierania reakcji:', e); return; }
             }
             if (reaction.message.partial) {
-                try { await reaction.message.fetch(); } catch { return; }
+                try { await reaction.message.fetch(); } catch (e) { console.error('Błąd pobierania wiadomości:', e); return; }
             }
             if (reaction.emoji.id !== '1543969158646206475') return;
 
@@ -158,11 +164,19 @@ module.exports = {
         }
 
         client.on('messageReactionAdd', async (reaction, user) => {
-            await handleReactionChange(reaction, user, true);
+            try {
+                await handleReactionChange(reaction, user, true);
+            } catch (error) {
+                console.error('Błąd w messageReactionAdd:', error);
+            }
         });
 
         client.on('messageReactionRemove', async (reaction, user) => {
-            await handleReactionChange(reaction, user, false);
+            try {
+                await handleReactionChange(reaction, user, false);
+            } catch (error) {
+                console.error('Błąd w messageReactionRemove:', error);
+            }
         });
     }
 };
