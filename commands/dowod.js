@@ -40,6 +40,28 @@ async function sendDm(client, userId, content) {
     }
 }
 
+async function checkRobloxAccount(nickRoblox) {
+    try {
+        const response = await fetch(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(nickRoblox)}`);
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (!data.data || data.data.length === 0) return null;
+        
+        // Szukanie dokładnego dopasowania nazwy (ignorując wielkość liter)
+        const exactMatch = data.data.find(u => u.name.toLowerCase() === nickRoblox.toLowerCase());
+        if (!exactMatch) return null;
+
+        return {
+            id: exactMatch.id,
+            name: exactMatch.name,
+            profileUrl: `https://www.roblox.com/users/${exactMatch.id}/profile`
+        };
+    } catch (error) {
+        console.error('Błąd sprawdzania konta Roblox:', error);
+        return null;
+    }
+}
+
 function parsePlec(text) {
     if (!text) return "Nieznana";
     const rawValue = text.trim().toUpperCase();
@@ -70,7 +92,7 @@ function generateListaEmbed(dowody, page, totalPages) {
                 `<:arrow:1543977081233342494> **Data urodzenia:** ${d.dataUrodzenia}\n` +
                 `<:arrow:1543977081233342494> **Miejsce urodzenia:** ${d.miejsceUrodzenia}\n` +
                 `<:arrow:1543977081233342494> **Płeć:** ${d.plec}\n` +
-                `<:arrow:1543977081233342494> **Nick Roblox:** ${d.nickRoblox || 'Brak'}\n\n`;
+                `<:arrow:1543977081233342494> **Roblox:** ${d.nickRoblox || 'Brak'}\n\n`;
     });
 
     embed.setDescription(desc || 'Brak dowodów w bazie.');
@@ -587,7 +609,7 @@ module.exports = {
                 
                 if (db) await db.collection('wnioski_dowody').deleteOne({ messageId: logMessageId });
 
-                const channel = await interaction.client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+                const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
                 if (channel) {
                     const msg = await channel.messages.fetch(logMessageId).catch(() => null);
                     if (msg && msg.embeds.length > 0) {
@@ -603,7 +625,7 @@ module.exports = {
                 }
 
                 if (targetUserId) {
-                    await sendDm(interaction.client, targetUserId, '# <a:redtick:1543991522192527450> Wniosek odrzucony\n<:arrow:1543977081233342494> Twój wniosek/prośba o dowód został odrzucony przez administrację.\n<:arrow:1543977081233342494> **Powód:** ${powod}');
+                    await sendDm(interaction.client, targetUserId, `# <a:redtick:1543991522192527450> Wniosek odrzucony\n<:arrow:1543977081233342494> Twój wniosek/prośba o dowód został odrzucony przez administrację.\n<:arrow:1543977081233342494> **Powód:** ${powod}`);
                 }
 
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Pomyślnie odrzucono wniosek i wysłano powód na PV.' });
@@ -618,10 +640,19 @@ module.exports = {
                 const miejsceUrodzenia = interaction.fields.getTextInputValue('dowod_miejsce').trim();
                 const rawPlec = interaction.fields.getTextInputValue('dowod_plec').trim();
                 const plec = parsePlec(rawPlec);
-                const nickRoblox = interaction.fields.getTextInputValue('dowod_roblox').trim();
+                const rawNickRoblox = interaction.fields.getTextInputValue('dowod_roblox').trim();
                 const nickDiscord = interaction.user.tag;
 
-                const channel = await interaction.client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+                // Sprawdzanie konta Roblox przez HTTP API
+                const robloxCheck = await checkRobloxAccount(rawNickRoblox);
+                if (!robloxCheck) {
+                    await sendDm(client, interaction.user.id, `# <a:redtick:1543991522192527450> Wniosek odrzucony automatycznie\n<:arrow:1543977081233342494> Podane konto Roblox (**${rawNickRoblox}**) nie istnieje w bazie Roblox. Wniosek został odrzucony.`);
+                    return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd weryfikacji Roblox\n<:arrow:1543977081233342494> Konto Roblox o nazwie **' + rawNickRoblox + '** nie istnieje. Wniosek został automatycznie odrzucony.' });
+                }
+
+                const nickRoblox = `[${robloxCheck.name}](${robloxCheck.profileUrl})`;
+
+                const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
                 if (!channel) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Brak kanału logów.' });
 
                 const uniqueId = `${interaction.user.id}_${Date.now()}`;
@@ -667,7 +698,7 @@ module.exports = {
                 );
                 await sentMsg.edit({ components: [updatedRow] });
 
-                await sendDm(interaction.client, interaction.user.id, '# <a:checkmark:1543969158646206475> Wniosek wysłany\n<:arrow:1543977081233342494> Twój wniosek o dowód tożsamości został wysłany do weryfikacji!');
+                await sendDm(client, interaction.user.id, '# <a:checkmark:1543969158646206475> Wniosek wysłany\n<:arrow:1543977081233342494> Twój wniosek o dowód tożsamości został wysłany do weryfikacji!');
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Wniosek został wysłany do weryfikacji!' });
             }
 
@@ -680,12 +711,18 @@ module.exports = {
                 const stareDane = await db.collection('dowody').findOne({ userId: interaction.user.id });
                 if (!stareDane) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie znaleziono dowodu.' });
 
+                const rawNickRoblox = interaction.fields.getTextInputValue('dowod_roblox').trim();
+                const robloxCheck = await checkRobloxAccount(rawNickRoblox);
+                if (!robloxCheck) {
+                    return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd weryfikacji Roblox\n<:arrow:1543977081233342494> Konto Roblox o nazwie **' + rawNickRoblox + '** nie istnieje. Edycja odrzucona.' });
+                }
+
                 const noweDane = {
                     imieNazwisko: interaction.fields.getTextInputValue('dowod_imie').trim(),
                     dataUrodzenia: interaction.fields.getTextInputValue('dowod_data').trim(),
                     miejsceUrodzenia: interaction.fields.getTextInputValue('dowod_miejsce').trim(),
                     plec: parsePlec(interaction.fields.getTextInputValue('dowod_plec').trim()),
-                    nickRoblox: interaction.fields.getTextInputValue('dowod_roblox').trim(),
+                    nickRoblox: `[${robloxCheck.name}](${robloxCheck.profileUrl})`,
                     nickDiscord: interaction.user.tag
                 };
 
@@ -730,7 +767,7 @@ module.exports = {
                 );
                 await sentMsg.edit({ components: [updatedRow] });
 
-                await sendDm(interaction.client, interaction.user.id, '# <a:checkmark:1543969158646206475> Prośba o edycję\n<:arrow:1543977081233342494> Twoja prośba o edycję danych została wysłana do administracji.');
+                await sendDm(client, interaction.user.id, '# <a:checkmark:1543969158646206475> Prośba o edycję\n<:arrow:1543977081233342494> Twoja prośba o edycję danych została wysłana do administracji.');
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Wysłano prośbę o edycję do administracji.' });
             }
 
@@ -868,7 +905,7 @@ module.exports = {
                     await logChannel.send({ embeds: [embedLog] });
                 }
 
-                await sendDm(interaction.client, userId, '# <a:checkmark:1543969158646206475> Dowód utworzony\n<:arrow:1543977081233342494> Administrator utworzył dla Ciebie dowód tożsamości.');
+                await sendDm(client, userId, '# <a:checkmark:1543969158646206475> Dowód utworzony\n<:arrow:1543977081233342494> Administrator utworzył dla Ciebie dowód tożsamości.');
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Ręcznie utworzono dowód tożsamości i opublikowano go na kanale.' });
             }
 
@@ -883,7 +920,13 @@ module.exports = {
                 const dataUrodzenia = interaction.fields.getTextInputValue('admin_ed_data').trim();
                 const miejsceUrodzenia = interaction.fields.getTextInputValue('admin_ed_miejsce').trim();
                 const plec = parsePlec(interaction.fields.getTextInputValue('admin_ed_plec').trim());
-                const nickRoblox = interaction.fields.getTextInputValue('admin_ed_roblox').trim();
+                const rawRoblox = interaction.fields.getTextInputValue('admin_ed_roblox').trim();
+
+                const robloxCheck = await checkRobloxAccount(rawRoblox);
+                if (!robloxCheck) {
+                    return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd weryfikacji Roblox\n<:arrow:1543977081233342494> Konto Roblox o nazwie **' + rawRoblox + '** nie istnieje.' });
+                }
+                const nickRoblox = `[${robloxCheck.name}](${robloxCheck.profileUrl})`;
 
                 const dowod = await db.collection('dowody').findOne({ userId });
                 if (!dowod) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie znaleziono dowodu.' });
@@ -914,8 +957,8 @@ module.exports = {
                     }
                 }
 
-                await sendDm(interaction.client, userId, '# <a:checkmark:1543969158646206475> Dowód edytowany\n<:arrow:1543977081233342494> Twój dowód został zaktualizowany przez administratora.');
-                await sendLog(interaction.client, `# <a:dot:1543969325155745812> **Admin edytował dowód**\n<:arrow:1543977081233342494> **Właściciel:** <@${userId}> | **Admin:** ${interaction.user.tag}`);
+                await sendDm(client, userId, '# <a:checkmark:1543969158646206475> Dowód edytowany\n<:arrow:1543977081233342494> Twój dowód został zaktualizowany przez administratora.');
+                await sendLog(client, `# <a:dot:1543969325155745812> **Admin edytował dowód**\n<:arrow:1543977081233342494> **Właściciel:** <@${userId}> | **Admin:** ${interaction.user.tag}`);
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Pomyślnie zaktualizowano dowód użytkownika.' });
             }
         });
@@ -940,8 +983,8 @@ module.exports = {
                     await db.collection('dowody').deleteOne({ userId });
                 }
 
-                await sendDm(interaction.client, userId, '# <a:redtick:1543991522192527450> Dowód usunięty\n<:arrow:1543977081233342494> Twój dowód został usunięty przez administratora.');
-                await sendLog(interaction.client, `# <a:dot:1543969325155745812> **Admin usunął dowód**\n<:arrow:1543977081233342494> **Właściciel:** <@${userId}> | **Admin:** ${interaction.user.tag}`);
+                await sendDm(client, userId, '# <a:redtick:1543991522192527450> Dowód usunięty\n<:arrow:1543977081233342494> Twój dowód został usunięty przez administratora.');
+                await sendLog(client, `# <a:dot:1543969325155745812> **Admin usunął dowód**\n<:arrow:1543977081233342494> **Właściciel:** <@${userId}> | **Admin:** ${interaction.user.tag}`);
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Usunięto dowód użytkownika.' });
             }
 
