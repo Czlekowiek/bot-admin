@@ -81,6 +81,7 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('dowod')
         .setDescription('Zaawansowany system dowodów tożsamości.')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
         .addSubcommand(sub =>
             sub.setName('panel')
                 .setDescription('Wysyła publiczny panel zarządzania dowodem dla użytkowników.'))
@@ -93,6 +94,10 @@ module.exports = {
 
     async execute(interaction) {
         try {
+            if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Ta komenda jest dostępna tylko dla administratorów.', ephemeral: true });
+            }
+
             const subcommand = interaction.options.getSubcommand();
 
             if (subcommand === 'panel') {
@@ -111,10 +116,6 @@ module.exports = {
                 await interaction.reply({ embeds: [embed], components: [row] });
 
             } else if (subcommand === 'admin-panel') {
-                if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
-                    return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie masz uprawnień do tej komendy.', ephemeral: true });
-                }
-
                 const embed = new EmbedBuilder()
                     .setTitle('🛡️ Panel Administracyjny Dowodów')
                     .setDescription('Użyj poniższych przycisków, aby zarządzać bazą dowodów graczy.')
@@ -128,10 +129,6 @@ module.exports = {
                 await interaction.reply({ embeds: [embed], components: [row] });
 
             } else if (subcommand === 'lista') {
-                if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
-                    return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie masz uprawnień do tej komendy.', ephemeral: true });
-                }
-
                 await interaction.deferReply({ ephemeral: true });
                 const db = getDb();
                 if (!db) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Błąd bazy danych.' });
@@ -165,7 +162,6 @@ module.exports = {
         try {
             const customId = interaction.customId;
 
-            // Obsługa paginacji listy dowodów
             if (customId.startsWith('lista_prev_') || customId.startsWith('lista_next_')) {
                 await interaction.deferUpdate();
                 const db = getDb();
@@ -591,7 +587,7 @@ module.exports = {
                 
                 if (db) await db.collection('wnioski_dowody').deleteOne({ messageId: logMessageId });
 
-                const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+                const channel = await interaction.client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
                 if (channel) {
                     const msg = await channel.messages.fetch(logMessageId).catch(() => null);
                     if (msg && msg.embeds.length > 0) {
@@ -607,7 +603,7 @@ module.exports = {
                 }
 
                 if (targetUserId) {
-                    await sendDm(client, targetUserId, `# <a:redtick:1543991522192527450> Wniosek odrzucony\n<:arrow:1543977081233342494> Twój wniosek/prośba o dowód został odrzucony przez administrację.\n<:arrow:1543977081233342494> **Powód:** ${powod}`);
+                    await sendDm(interaction.client, targetUserId, '# <a:redtick:1543991522192527450> Wniosek odrzucony\n<:arrow:1543977081233342494> Twój wniosek/prośba o dowód został odrzucony przez administrację.\n<:arrow:1543977081233342494> **Powód:** ${powod}');
                 }
 
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Pomyślnie odrzucono wniosek i wysłano powód na PV.' });
@@ -625,7 +621,7 @@ module.exports = {
                 const nickRoblox = interaction.fields.getTextInputValue('dowod_roblox').trim();
                 const nickDiscord = interaction.user.tag;
 
-                const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+                const channel = await interaction.client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
                 if (!channel) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Brak kanału logów.' });
 
                 const uniqueId = `${interaction.user.id}_${Date.now()}`;
@@ -671,7 +667,7 @@ module.exports = {
                 );
                 await sentMsg.edit({ components: [updatedRow] });
 
-                await sendDm(client, interaction.user.id, '# <a:checkmark:1543969158646206475> Wniosek wysłany\n<:arrow:1543977081233342494> Twój wniosek o dowód tożsamości został wysłany do weryfikacji!');
+                await sendDm(interaction.client, interaction.user.id, '# <a:checkmark:1543969158646206475> Wniosek wysłany\n<:arrow:1543977081233342494> Twój wniosek o dowód tożsamości został wysłany do weryfikacji!');
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Wniosek został wysłany do weryfikacji!' });
             }
 
@@ -693,7 +689,7 @@ module.exports = {
                     nickDiscord: interaction.user.tag
                 };
 
-                const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+                const channel = await interaction.client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
                 if (!channel) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Brak kanału logów.' });
 
                 const uniqueId = `${interaction.user.id}_${Date.now()}`;
@@ -734,7 +730,7 @@ module.exports = {
                 );
                 await sentMsg.edit({ components: [updatedRow] });
 
-                await sendDm(client, interaction.user.id, '# <a:checkmark:1543969158646206475> Prośba o edycję\n<:arrow:1543977081233342494> Twoja prośba o edycję danych została wysłana do administracji.');
+                await sendDm(interaction.client, interaction.user.id, '# <a:checkmark:1543969158646206475> Prośba o edycję\n<:arrow:1543977081233342494> Twoja prośba o edycję danych została wysłana do administracji.');
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Wysłano prośbę o edycję do administracji.' });
             }
 
@@ -810,11 +806,11 @@ module.exports = {
 
                 let targetUserTag = "Nieznany";
                 try {
-                    const fetchedUser = await client.users.fetch(userId).catch(() => null);
+                    const fetchedUser = await interaction.client.users.fetch(userId).catch(() => null);
                     if (fetchedUser) targetUserTag = fetchedUser.tag;
                 } catch {}
 
-                const channelDowody = await client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
+                const channelDowody = await interaction.client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
                 let sentDowodMsgId = null;
 
                 if (channelDowody) {
@@ -867,12 +863,12 @@ module.exports = {
                         `<:arrow:1543977081233342494> **Data:** ${formatDate(new Date())}`
                     );
 
-                const logChannel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+                const logChannel = await interaction.client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
                 if (logChannel) {
                     await logChannel.send({ embeds: [embedLog] });
                 }
 
-                await sendDm(client, userId, '# <a:checkmark:1543969158646206475> Dowód utworzony\n<:arrow:1543977081233342494> Administrator utworzył dla Ciebie dowód tożsamości.');
+                await sendDm(interaction.client, userId, '# <a:checkmark:1543969158646206475> Dowód utworzony\n<:arrow:1543977081233342494> Administrator utworzył dla Ciebie dowód tożsamości.');
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Ręcznie utworzono dowód tożsamości i opublikowano go na kanale.' });
             }
 
@@ -897,7 +893,7 @@ module.exports = {
                 });
 
                 if (dowod.messageId) {
-                    const channelDowody = await client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
+                    const channelDowody = await interaction.client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
                     if (channelDowody) {
                         const msg = await channelDowody.messages.fetch(dowod.messageId).catch(() => null);
                         if (msg) {
@@ -918,8 +914,8 @@ module.exports = {
                     }
                 }
 
-                await sendDm(client, userId, '# <a:checkmark:1543969158646206475> Dowód edytowany\n<:arrow:1543977081233342494> Twój dowód został zaktualizowany przez administratora.');
-                await sendLog(client, `# <a:dot:1543969325155745812> **Admin edytował dowód**\n<:arrow:1543977081233342494> **Właściciel:** <@${userId}> | **Admin:** ${interaction.user.tag}`);
+                await sendDm(interaction.client, userId, '# <a:checkmark:1543969158646206475> Dowód edytowany\n<:arrow:1543977081233342494> Twój dowód został zaktualizowany przez administratora.');
+                await sendLog(interaction.client, `# <a:dot:1543969325155745812> **Admin edytował dowód**\n<:arrow:1543977081233342494> **Właściciel:** <@${userId}> | **Admin:** ${interaction.user.tag}`);
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Pomyślnie zaktualizowano dowód użytkownika.' });
             }
         });
@@ -935,7 +931,7 @@ module.exports = {
                 if (db) {
                     const dowod = await db.collection('dowody').findOne({ userId });
                     if (dowod && dowod.messageId) {
-                        const channelDowody = await client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
+                        const channelDowody = await interaction.client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
                         if (channelDowody) {
                             const msg = await channelDowody.messages.fetch(dowod.messageId).catch(() => null);
                             if (msg) await msg.delete().catch(() => {});
@@ -944,8 +940,8 @@ module.exports = {
                     await db.collection('dowody').deleteOne({ userId });
                 }
 
-                await sendDm(client, userId, '# <a:redtick:1543991522192527450> Dowód usunięty\n<:arrow:1543977081233342494> Twój dowód został usunięty przez administratora.');
-                await sendLog(client, `# <a:dot:1543969325155745812> **Admin usunął dowód**\n<:arrow:1543977081233342494> **Właściciel:** <@${userId}> | **Admin:** ${interaction.user.tag}`);
+                await sendDm(interaction.client, userId, '# <a:redtick:1543991522192527450> Dowód usunięty\n<:arrow:1543977081233342494> Twój dowód został usunięty przez administratora.');
+                await sendLog(interaction.client, `# <a:dot:1543969325155745812> **Admin usunął dowód**\n<:arrow:1543977081233342494> **Właściciel:** <@${userId}> | **Admin:** ${interaction.user.tag}`);
                 await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Usunięto dowód użytkownika.' });
             }
 
