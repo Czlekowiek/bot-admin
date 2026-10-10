@@ -2,8 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const { Client, GatewayIntentBits, Partials, Collection, REST, Routes } = require('discord.js');
-const { MongoClient, ServerApiVersion } = require('mongodb');
 
+const { connectDB } = require('./utils/database');
 const { generateStaffEmbed } = require('./utils/sklad-administracji');
 const { sendWelcomeMessage } = require('./utils/welcome');
 const { sendLeaveMessage } = require('./utils/bye');
@@ -11,28 +11,7 @@ const { sendLeaveMessage } = require('./utils/bye');
 // =========================================================
 // MONGODB CONNECTION
 // =========================================================
-
-const uri = process.env.MONGO_URI;
-let db = null;
-
-if (uri) {
-    const mongoClient = new MongoClient(uri, {
-        serverApi: {
-            version: ServerApiVersion.v1,
-            strict: true,
-            deprecationErrors: true,
-        }
-    });
-
-    mongoClient.connect().then(() => {
-        db = mongoClient.db('bot_database');
-        console.log('Połączono pomyślnie z bazą danych MongoDB!');
-    }).catch(err => {
-        console.error('Błąd podczas łączenia z MongoDB:', err);
-    });
-} else {
-    console.warn('Brak zmiennej środowiskowej MONGO_URI! Baza danych nie została zainicjalizowana.');
-}
+connectDB();
 
 // =========================================================
 // HTTP SERVER - RENDER
@@ -192,13 +171,10 @@ client.on('interactionCreate', async interaction => {
 });
 
 // =========================================================
-// EKSPORT KLIENTA ORAZ BAZY DANYCH
+// EKSPORT KLIENTA
 // =========================================================
 
-module.exports = {
-    client,
-    getDb: () => db
-};
+module.exports = { client };
 
 // =========================================================
 // ZAMYKANIE PROCESU I LOGOWANIE

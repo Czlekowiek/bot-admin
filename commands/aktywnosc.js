@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
-const { getDb } = require('../index');
+const { getDb } = require('../utils/database');
 
 async function getActivityData(messageId) {
     const db = getDb();
@@ -108,7 +108,6 @@ module.exports = {
                 text: `Stworzone przez @czlekowiek • Data: ${formattedTime}`
             });
 
-        // Wysłanie wiadomości bez pingu everyone/here
         const sentMessage = await channel.send({
             embeds: [embed]
         });
@@ -118,7 +117,7 @@ module.exports = {
         await saveActivityData(sentMessage.id, [], false);
 
         return interaction.reply({ 
-            content: '# <a:dot:1543969325155745812> Sukces\n<:arrow:1543977081233342494> Utworzono wiadomość aktywności na kanale <#' + channelId + '>.', 
+            content: `# <a:dot:1543969325155745812> Sukces\n<:arrow:1543977081233342494> Utworzono wiadomość aktywności na kanale <#${channelId}>.`, 
             ephemeral: true 
         });
     },
