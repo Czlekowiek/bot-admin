@@ -66,9 +66,9 @@ async function updateActivityBoard(message, usersList) {
     const description = embed.description || '';
     
     const opisMatch = description.split(/### <:arrow:1543977081233342494> Opis: /);
-    const activityDescription = opisMatch[1] ? opisMatch[1].split('\n## <:calendar:')[0] : null;
+    const activityDescription = opisMatch[1] ? opisMatch[1].split('\n## <a:dot:')[0] : null;
 
-    const dzienMatch = description.match(/## <:calendar:1558451710379167744> Dzień aktywności: ([\s\S]*?)(?=\n\n###|$)/);
+    const dzienMatch = description.match(/## <a:dot:1543969325155745812> Dzień ([\s\S]*?)(?=\n\n###|$)/);
     const dzienEmotki = dzienMatch ? dzienMatch[1] : null;
 
     const top1 = usersList[0] ? `<@${usersList[0]}>` : 'Brak';
@@ -83,7 +83,7 @@ async function updateActivityBoard(message, usersList) {
         `## <a:dot:1543969325155745812> Zareaguj emotką "<a:checkmark:1543969158646206475>" poniżej aby zaznaczyć aktywność.`;
 
     if (dzienEmotki) {
-        newDescription += `\n\n## <:calendar:1558451710379167744> Dzień aktywności: ${dzienEmotki}`;
+        newDescription += `\n\n## <a:dot:1543969325155745812> Dzień ${dzienEmotki}`;
     }
 
     if (activityDescription) {
@@ -104,7 +104,7 @@ module.exports = {
                 .setRequired(false))
         .addStringOption(option =>
             option.setName('dzien')
-                .setDescription('Numer dnia aktywności (opcjonalnie, np. 31)')
+                .setDescription('(opcjonalnie)')
                 .setRequired(false))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
@@ -133,7 +133,7 @@ module.exports = {
 
         if (dzienInput) {
             const formattedDzien = formatNumberToEmojis(dzienInput.trim());
-            descriptionText += `\n\n## <:calendar:1558451710379167744> Dzień aktywności: ${formattedDzien}`;
+            descriptionText += `\n\n## <a:dot:1543969325155745812> Dzień ${formattedDzien}`;
         }
 
         if (opis) {
