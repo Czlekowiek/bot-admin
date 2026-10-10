@@ -158,7 +158,8 @@ client.on('interactionCreate', async interaction => {
     const command = client.commands.get(interaction.commandName);
     if (!command || typeof command.execute !== 'function') return;
 
-    await sendLog(`# <a:dot:1543969325155745812> **Użycie komendy**\n<:arrow:1543977081233342494> Użytkownik **${interaction.user.tag}** (\`${interaction.user.id}\`) użył \`/${interaction.commandName}\` na kanale <#${interaction.channelId}>.`);
+    // Wysyłamy log w tle, aby nie opóźniać odpowiedzi na interakcję Discorda
+    sendLog(`# <a:dot:1543969325155745812> **Użycie komendy**\n<:arrow:1543977081233342494> Użytkownik **${interaction.user.tag}** (\`${interaction.user.id}\`) użył \`/${interaction.commandName}\` na kanale <#${interaction.channelId}>.`).catch(() => {});
     
     try {
         await command.execute(interaction);
