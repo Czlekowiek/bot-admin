@@ -1,6 +1,28 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const { getDb } = require('../utils/database');
 
+// Słownik emotek cyfr od 0 do 9
+const DIGIT_EMOJIS = {
+    '0': '<:0_:1543975892429053982>',
+    '1': '<:1_:1543975655287558246>',
+    '2': '<:2_:1543975728830480414>',
+    '3': '<:3_:1543975757704073396>',
+    '4': '<:4_:1543975782395813968>',
+    '5': '<:5_:1543975804696920105>',
+    '6': '<:6_:1543975832555495514>',
+    '7': '<:7_:1543975850138140742>',
+    '8': '<:8_:1543975862418800740>',
+    '9': '<:9_:1543975879984554014>'
+};
+
+// Funkcja zamieniająca np. "31" na string z emotkami cyfr
+function formatNumberToEmojis(numberStr) {
+    return String(numberStr)
+        .split('')
+        .map(char => DIGIT_EMOJIS[char] || char)
+        .join('');
+}
+
 async function getActivityData(messageId) {
     const db = getDb();
     if (!db) return null;
@@ -42,8 +64,12 @@ async function updateActivityBoard(message, usersList) {
 
     const embed = message.embeds[0];
     const description = embed.description || '';
+    
     const opisMatch = description.split(/### <:arrow:1543977081233342494> Opis: /);
-    const activityDescription = opisMatch[1] ? opisMatch[1] : null;
+    const activityDescription = opisMatch[1] ? opisMatch[1].split('\n## <:calendar:')[0] : null;
+
+    const dzienMatch = description.match(/## <:calendar:1558451710379167744> Dzień aktywności: ([\s\S]*?)(?=\n\n###|$)/);
+    const dzienEmotki = dzienMatch ? dzienMatch[1] : null;
 
     const top1 = usersList[0] ? `<@${usersList[0]}>` : 'Brak';
     const top2 = usersList[1] ? `<@${usersList[1]}>` : 'Brak';
@@ -56,8 +82,12 @@ async function updateActivityBoard(message, usersList) {
         `## <a:top3:1548673801104138322> ${top3}\n\n` +
         `## <a:dot:1543969325155745812> Zareaguj emotką "<a:checkmark:1543969158646206475>" poniżej aby zaznaczyć aktywność.`;
 
+    if (dzienEmotki) {
+        newDescription += `\n\n## <:calendar:1558451710379167744> Dzień aktywności: ${dzienEmotki}`;
+    }
+
     if (activityDescription) {
-        newDescription += `\n\n### <:arrow:1543977081233342494> Opis: ${activityDescription}`;
+        newDescription += `\n\n### <:arrow:1543977081233342494> Opis: ${activityDescription.trim()}`;
     }
 
     const updatedEmbed = EmbedBuilder.from(embed).setDescription(newDescription);
@@ -72,12 +102,17 @@ module.exports = {
             option.setName('opis')
                 .setDescription('Opis (opcjonalnie)')
                 .setRequired(false))
+        .addStringOption(option =>
+            option.setName('dzien')
+                .setDescription('Numer dnia aktywności (opcjonalnie, np. 31)')
+                .setRequired(false))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction) {
         await interaction.deferReply({ ephemeral: true });
 
         const opis = interaction.options.getString('opis');
+        const dzienInput = interaction.options.getString('dzien');
         const targetChannelId = '1542122742768210000';
 
         let channel = await interaction.guild.channels.fetch(targetChannelId).catch(() => null);
@@ -96,6 +131,11 @@ module.exports = {
 
         let descriptionText = `# <a:checkmark:1543969158646206475> Aktywność check\n## <a:top1:1548673656761352304> Brak\n## <a:top2:1548673747983011891> Brak\n## <a:top3:1548673801104138322> Brak\n\n## <a:dot:1543969325155745812> Zareaguj emotką "<a:checkmark:1543969158646206475>" poniżej aby zaznaczyć aktywność.`;
 
+        if (dzienInput) {
+            const formattedDzien = formatNumberToEmojis(dzienInput.trim());
+            descriptionText += `\n\n## <:calendar:1558451710379167744> Dzień aktywności: ${formattedDzien}`;
+        }
+
         if (opis) {
             descriptionText += `\n\n### <:arrow:1543977081233342494> Opis: ${opis}`;
         }
@@ -107,7 +147,6 @@ module.exports = {
                 text: `Stworzone przez @czlekowiek • Data: ${formattedTime}`
             });
 
-        // Wysłanie wiadomości z pingiem @everyone oraz embedem
         const sentMessage = await channel.send({
             content: '@everyone',
             embeds: [embed]
