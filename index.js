@@ -112,7 +112,7 @@ async function updateAdminMessage(guild) {
 client.once('ready', async () => {
     console.log(`Zalogowano jako ${client.user.tag}!`);
     setTimeout(async () => {
-        await sendLog(`# <a:dot:1543969325155745812> **Bot został uruchomiony**\n<:arrow:1543977081233342494> Zalogowano jako: \`${client.user.tag}\``);
+        await sendLog('Bot został uruchomiony');
     }, 2000);
 
     const guild = client.guilds.cache.first();
@@ -144,7 +144,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 });
 
 // =========================================================
-// UNIWERSALNA OBSŁUGA KOMEND SLASH (Z BEZPIECZNYM DEFEREM)
+// UNIWERSALNA OBSŁUGA KOMEND SLASH
 // =========================================================
 
 client.on('interactionCreate', async interaction => {
@@ -153,28 +153,19 @@ client.on('interactionCreate', async interaction => {
     const command = client.commands.get(interaction.commandName);
     if (!command || typeof command.execute !== 'function') return;
 
-    sendLog(`# <a:dot:1543969325155745812> **Użycie komendy**\n<:arrow:1543977081233342494> Użytkownik **${interaction.user.tag}** (\`${interaction.user.id}\`) użył \`/${interaction.commandName}\` na kanale <#${interaction.channelId}>.`).catch(() => {});
+    sendLog(`Użytkownik ${interaction.user.tag} użył /${interaction.commandName}`).catch(() => {});
     
-    // Natychmiastowe odroczenie zapobiegające błędu "Aplikacja nie reaguje"
-    try {
-        await interaction.deferReply({ ephemeral: true });
-    } catch (e) {}
-
-    // Proxy dla metod odpowiedzi, aby komendy używające interaction.reply działały poprawnie
-    const originalReply = interaction.reply.bind(interaction);
-    interaction.reply = async (options) => {
-        return await interaction.editReply(options);
-    };
-    interaction.deferReply = async () => {
-        return interaction;
-    };
-
     try {
         await command.execute(interaction);
     } catch (error) {
         console.error(`Błąd w komendze ${interaction.commandName}:`, error);
+        const replyOptions = { content: 'Wystąpił błąd podczas wykonywania tej komendy!', ephemeral: true };
         try {
-            await interaction.editReply({ content: 'Wystąpił błąd podczas wykonywania tej komendy!' });
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp(replyOptions);
+            } else {
+                await interaction.reply(replyOptions);
+            }
         } catch (e) {}
     }
 });
