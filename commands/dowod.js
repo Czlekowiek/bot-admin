@@ -53,6 +53,30 @@ function formatDate(date) {
     return new Date(date).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'medium' });
 }
 
+function generateListaEmbed(dowody, page, totalPages) {
+    const itemsPerPage = 5;
+    const start = page * itemsPerPage;
+    const pageItems = dowody.slice(start, start + itemsPerPage);
+
+    const embed = new EmbedBuilder()
+        .setTitle(`🪪 Lista Bazy Dowodów (${dowody.length})`)
+        .setColor(0x2b2d31)
+        .setFooter({ text: `Strona ${page + 1} z ${totalPages || 1}` });
+
+    let desc = '';
+    pageItems.forEach((d, idx) => {
+        desc += `### ${start + idx + 1}. ${d.imieNazwisko}\n` +
+                `<:arrow:1543977081233342494> **Właściciel:** <@${d.userId}> (\`${d.userId}\`)\n` +
+                `<:arrow:1543977081233342494> **Data urodzenia:** ${d.dataUrodzenia}\n` +
+                `<:arrow:1543977081233342494> **Miejsce urodzenia:** ${d.miejsceUrodzenia}\n` +
+                `<:arrow:1543977081233342494> **Płeć:** ${d.plec}\n` +
+                `<:arrow:1543977081233342494> **Nick Roblox:** ${d.nickRoblox || 'Brak'}\n\n`;
+    });
+
+    embed.setDescription(desc || 'Brak dowodów w bazie.');
+    return embed;
+}
+
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('dowod')
@@ -62,7 +86,10 @@ module.exports = {
                 .setDescription('Wysyła publiczny panel zarządzania dowodem dla użytkowników.'))
         .addSubcommand(sub =>
             sub.setName('admin-panel')
-                .setDescription('Wysyła publiczny panel administracyjny do zarządzania dowodami.')),
+                .setDescription('Wysyła publiczny panel administracyjny do zarządzania dowodami.'))
+        .addSubcommand(sub =>
+            sub.setName('lista')
+                .setDescription('Wyświetla pełną listę wszystkich utworzonych dowodów tożsamości.')),
 
     async execute(interaction) {
         try {
@@ -99,6 +126,32 @@ module.exports = {
                 );
 
                 await interaction.reply({ embeds: [embed], components: [row] });
+
+            } else if (subcommand === 'lista') {
+                if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
+                    return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie masz uprawnień do tej komendy.', ephemeral: true });
+                }
+
+                await interaction.deferReply({ ephemeral: true });
+                const db = getDb();
+                if (!db) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Błąd bazy danych.' });
+
+                const dowody = await db.collection('dowody').find({}).toArray();
+                if (!dowody || dowody.length === 0) {
+                    return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> W bazie danych nie ma jeszcze żadnych dowodów.' });
+                }
+
+                const totalPages = Math.ceil(dowody.length / 5);
+                const currentPage = 0;
+
+                const embed = generateListaEmbed(dowody, currentPage, totalPages);
+
+                const row = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId(`lista_prev_${currentPage}`).setLabel('Poprzednia').setStyle(ButtonStyle.Secondary).setEmoji('◀️').setDisabled(true),
+                    new ButtonBuilder().setCustomId(`lista_next_${currentPage}`).setLabel('Następna').setStyle(ButtonStyle.Secondary).setEmoji('▶️').setDisabled(totalPages <= 1)
+                );
+
+                await interaction.editReply({ embeds: [embed], components: [row] });
             }
         } catch (error) {
             console.error('Błąd w /dowod:', error);
@@ -111,6 +164,33 @@ module.exports = {
     async handleButton(interaction) {
         try {
             const customId = interaction.customId;
+
+            // Obsługa paginacji listy dowodów
+            if (customId.startsWith('lista_prev_') || customId.startsWith('lista_next_')) {
+                await interaction.deferUpdate();
+                const db = getDb();
+                if (!db) return;
+
+                const dowody = await db.collection('dowody').find({}).toArray();
+                const totalPages = Math.ceil(dowody.length / 5);
+
+                const isNext = customId.startsWith('lista_next_');
+                const oldPage = parseInt(customId.split('_')[2]);
+                let newPage = isNext ? oldPage + 1 : oldPage - 1;
+
+                if (newPage < 0) newPage = 0;
+                if (newPage >= totalPages) newPage = totalPages - 1;
+
+                const embed = generateListaEmbed(dowody, newPage, totalPages);
+
+                const row = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId(`lista_prev_${newPage}`).setLabel('Poprzednia').setStyle(ButtonStyle.Secondary).setEmoji('◀️').setDisabled(newPage === 0),
+                    new ButtonBuilder().setCustomId(`lista_next_${newPage}`).setLabel('Następna').setStyle(ButtonStyle.Secondary).setEmoji('▶️').setDisabled(newPage >= totalPages - 1)
+                );
+
+                await interaction.editReply({ embeds: [embed], components: [row] });
+                return true;
+            }
 
             if (customId === 'dowod_stworz') {
                 const db = getDb();
@@ -136,7 +216,7 @@ module.exports = {
             if (customId === 'dowod_zobacz') {
                 await interaction.deferReply({ ephemeral: true });
                 const db = getDb();
-                if (!db) return interaction.editReply({ content: 'Błąd bazy danych.' });
+                if (!db) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Błąd bazy danych.' });
 
                 const dowod = await db.collection('dowody').findOne({ userId: interaction.user.id });
                 if (!dowod) {
@@ -160,7 +240,7 @@ module.exports = {
 
             if (customId === 'dowod_edytuj_start') {
                 const db = getDb();
-                if (!db) return interaction.reply({ content: 'Błąd bazy danych.', ephemeral: true });
+                if (!db) return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Błąd bazy danych.', ephemeral: true });
 
                 const dowod = await db.collection('dowody').findOne({ userId: interaction.user.id });
                 if (!dowod) {
@@ -182,7 +262,7 @@ module.exports = {
             if (customId === 'dowod_usun_start') {
                 await interaction.deferReply({ ephemeral: true });
                 const db = getDb();
-                if (!db) return interaction.editReply({ content: 'Błąd bazy danych.' });
+                if (!db) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Błąd bazy danych.' });
 
                 const dowod = await db.collection('dowody').findOne({ userId: interaction.user.id });
                 if (!dowod) {
@@ -190,7 +270,7 @@ module.exports = {
                 }
 
                 const channel = await interaction.client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
-                if (!channel) return interaction.editReply({ content: 'Nie znaleziono kanału logów.' });
+                if (!channel) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie znaleziono kanału logów.' });
 
                 const uniqueId = `${interaction.user.id}_${Date.now()}`;
                 const payload = {
@@ -266,9 +346,9 @@ module.exports = {
             const parts = customId.split('_');
             if (parts[0] !== 'dowod') return false;
 
-            const actionType = parts[1]; // akceptuj lub odrzuc
-            const subAction = parts[2]; // stworz, usun, edycja
-            const targetUserId = parts[3]; // Wbudowane bezpośrednio ID użytkownika!
+            const actionType = parts[1]; 
+            const subAction = parts[2]; 
+            const targetUserId = parts[3]; 
             const messageId = parts.slice(4).join('_');
 
             if (actionType === 'odrzuc') {
@@ -347,7 +427,7 @@ module.exports = {
                     }
 
                     await sendDm(interaction.client, targetUserId, '# <a:checkmark:1543969158646206475> Wniosek zaakceptowany\n<:arrow:1543977081233342494> Twój wniosek o dowód tożsamości został zatwierdzony przez administrację!');
-                    await interaction.editReply({ content: 'Pomyślnie zaakceptowano wniosek.' });
+                    await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Pomyślnie zaakceptowano wniosek o dowód.' });
 
                 } else if (subAction === 'usun') {
                     const stareDane = wniosek ? wniosek.stareDane : null;
@@ -379,10 +459,10 @@ module.exports = {
                     }
 
                     await sendDm(interaction.client, targetUserId, '# <a:checkmark:1543969158646206475> Usunięcie dowodu\n<:arrow:1543977081233342494> Twoja prośba o usunięcie dowodu została zatwierdzona.');
-                    await interaction.editReply({ content: 'Zatwierdzono usunięcie dowodu.' });
+                    await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Zatwierdzono usunięcie dowodu.' });
 
                 } else if (subAction === 'edycja') {
-                    if (!wniosek) return interaction.editReply({ content: 'Nie znaleziono danych.' });
+                    if (!wniosek) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie znaleziono danych.' });
                     const { createdAt, stareDane, noweDane } = wniosek;
 
                     if (db) {
@@ -450,7 +530,7 @@ module.exports = {
 
                     await interaction.message.edit({ embeds: [oldEmbed, newEmbedLog], components: [] }).catch(() => {});
                     await sendDm(interaction.client, targetUserId, '# <a:checkmark:1543969158646206475> Edycja zatwierdzona\n<:arrow:1543977081233342494> Twoja prośba o edycję danych dowodu została zaakceptowana.');
-                    await interaction.editReply({ content: 'Zatwierdzono edycję dowodu.' });
+                    await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Zatwierdzono edycję dowodu.' });
                 }
             }
 
@@ -458,8 +538,8 @@ module.exports = {
         } catch (error) {
             console.error('Błąd button handler:', error);
             try {
-                if (interaction.deferred || interaction.replied) await interaction.editReply({ content: 'Wystąpił błąd.' });
-                else await interaction.reply({ content: 'Wystąpił błąd.', ephemeral: true });
+                if (interaction.deferred || interaction.replied) await interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Wystąpił błąd.' });
+                else await interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Wystąpił błąd.', ephemeral: true });
             } catch {}
             return true;
         }
@@ -471,10 +551,10 @@ module.exports = {
                 await interaction.deferReply({ ephemeral: true });
                 const targetUserId = interaction.values[0];
                 const db = getDb();
-                if (!db) return interaction.editReply({ content: 'Błąd bazy.' });
+                if (!db) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Błąd bazy.' });
 
                 const wynik = await db.collection('dowody').findOne({ userId: targetUserId });
-                if (!wynik) return interaction.editReply({ content: 'Nie znaleziono wybranego dowodu.' });
+                if (!wynik) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie znaleziono wybranego dowodu.' });
 
                 const embed = new EmbedBuilder()
                     .setTitle(`🪪 Wybrany Dowód: ${wynik.imieNazwisko}`)
@@ -503,7 +583,7 @@ module.exports = {
             if (interaction.customId.startsWith('modal_odrzuc_powod_')) {
                 await interaction.deferReply({ ephemeral: true });
                 const parts = interaction.customId.split('_');
-                const targetUserId = parts[4]; // Bezpośrednio wyciągnięte ID użytkownika z modala
+                const targetUserId = parts[4];
                 const logMessageId = parts[5];
 
                 const powod = interaction.fields.getTextInputValue('odrzuc_powod').trim();
@@ -546,7 +626,7 @@ module.exports = {
                 const nickDiscord = interaction.user.tag;
 
                 const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
-                if (!channel) return interaction.editReply({ content: 'Brak kanału logów.' });
+                if (!channel) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Brak kanału logów.' });
 
                 const uniqueId = `${interaction.user.id}_${Date.now()}`;
                 const payload = {
@@ -599,10 +679,10 @@ module.exports = {
             if (interaction.customId === 'modal_dowod_edycja') {
                 await interaction.deferReply({ ephemeral: true });
                 const db = getDb();
-                if (!db) return interaction.editReply({ content: 'Błąd bazy danych.' });
+                if (!db) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Błąd bazy danych.' });
 
                 const stareDane = await db.collection('dowody').findOne({ userId: interaction.user.id });
-                if (!stareDane) return interaction.editReply({ content: 'Nie znaleziono dowodu.' });
+                if (!stareDane) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie znaleziono dowodu.' });
 
                 const noweDane = {
                     imieNazwisko: interaction.fields.getTextInputValue('dowod_imie').trim(),
@@ -614,7 +694,7 @@ module.exports = {
                 };
 
                 const channel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
-                if (!channel) return interaction.editReply({ content: 'Brak kanału logów.' });
+                if (!channel) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Brak kanału logów.' });
 
                 const uniqueId = `${interaction.user.id}_${Date.now()}`;
                 const payload = {
@@ -663,7 +743,7 @@ module.exports = {
                 await interaction.deferReply({ ephemeral: true });
                 const fraza = interaction.fields.getTextInputValue('szukaj_fraza').trim().toLowerCase();
                 const db = getDb();
-                if (!db) return interaction.editReply({ content: 'Błąd bazy.' });
+                if (!db) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Błąd bazy.' });
 
                 const dowody = await db.collection('dowody').find({}).toArray();
                 const wyniki = dowody.filter(d => 
@@ -719,7 +799,7 @@ module.exports = {
                 });
             }
 
-            // 4. Admin: Ręczne utworzenie
+            // 4. Admin: Ręczne utworzenie dowodu
             if (interaction.customId === 'modal_admin_weryfikuj') {
                 await interaction.deferReply({ ephemeral: true });
                 const userId = interaction.fields.getTextInputValue('w_id').trim();
@@ -728,17 +808,72 @@ module.exports = {
                 const miejsceUrodzenia = interaction.fields.getTextInputValue('w_miejsce').trim();
                 const plec = parsePlec(interaction.fields.getTextInputValue('w_plec').trim());
 
+                let targetUserTag = "Nieznany";
+                try {
+                    const fetchedUser = await client.users.fetch(userId).catch(() => null);
+                    if (fetchedUser) targetUserTag = fetchedUser.tag;
+                } catch {}
+
+                const channelDowody = await client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
+                let sentDowodMsgId = null;
+
+                if (channelDowody) {
+                    const embedDowod = new EmbedBuilder()
+                        .setTitle(`🪪 Dowód Tożsamości - ${imieNazwisko}`)
+                        .setColor(0x2b2d31)
+                        .setDescription(
+                            `<:arrow:1543977081233342494> **Imię i Nazwisko:** ${imieNazwisko}\n` +
+                            `<:arrow:1543977081233342494> **Data urodzenia:** ${dataUrodzenia}\n` +
+                            `<:arrow:1543977081233342494> **Miejsce urodzenia:** ${miejsceUrodzenia}\n` +
+                            `<:arrow:1543977081233342494> **Płeć:** ${plec}\n` +
+                            `<:arrow:1543977081233342494> **Nick Roblox:** Brak\n` +
+                            `<:arrow:1543977081233342494> **Nick Discord:** ${targetUserTag}`
+                        );
+                    const sentDMsg = await channelDowody.send({ content: `<@${userId}>`, embeds: [embedDowod] });
+                    sentDowodMsgId = sentDMsg.id;
+                }
+
                 const db = getDb();
                 if (db) {
                     await db.collection('dowody').updateOne(
                         { userId },
-                        { $set: { imieNazwisko, dataUrodzenia, miejsceUrodzenia, plec, nickRoblox: 'Brak', nickDiscord: 'Nieznany', verifiedAt: new Date(), verifiedBy: interaction.user.tag } },
+                        { 
+                            $set: { 
+                                imieNazwisko, 
+                                dataUrodzenia, 
+                                miejsceUrodzenia, 
+                                plec, 
+                                nickRoblox: 'Brak', 
+                                nickDiscord: targetUserTag, 
+                                verifiedAt: new Date(), 
+                                verifiedBy: interaction.user.tag,
+                                messageId: sentDowodMsgId
+                            } 
+                        },
                         { upsert: true }
                     );
                 }
 
+                const embedLog = new EmbedBuilder()
+                    .setTitle('🛠️ Ręczne Utworzenie Dowodu przez Admina')
+                    .setColor(0x57f287)
+                    .setDescription(
+                        `<:arrow:1543977081233342494> **Właściciel:** <@${userId}> (${targetUserTag})\n` +
+                        `<:arrow:1543977081233342494> **Imię i Nazwisko:** ${imieNazwisko}\n` +
+                        `<:arrow:1543977081233342494> **Data urodzenia:** ${dataUrodzenia}\n` +
+                        `<:arrow:1543977081233342494> **Miejsce urodzenia:** ${miejsceUrodzenia}\n` +
+                        `<:arrow:1543977081233342494> **Płeć:** ${plec}\n` +
+                        `<:arrow:1543977081233342494> **Administrator:** ${interaction.user.tag}\n` +
+                        `<:arrow:1543977081233342494> **Data:** ${formatDate(new Date())}`
+                    );
+
+                const logChannel = await client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+                if (logChannel) {
+                    await logChannel.send({ embeds: [embedLog] });
+                }
+
                 await sendDm(client, userId, '# <a:checkmark:1543969158646206475> Dowód utworzony\n<:arrow:1543977081233342494> Administrator utworzył dla Ciebie dowód tożsamości.');
-                await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Ręcznie utworzono dowód.' });
+                await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Ręcznie utworzono dowód tożsamości i opublikowano go na kanale.' });
             }
 
             // 5. Admin: Edycja bezpośrednia
@@ -746,7 +881,7 @@ module.exports = {
                 await interaction.deferReply({ ephemeral: true });
                 const userId = interaction.customId.replace('modal_admin_edytuj_zapisz_', '');
                 const db = getDb();
-                if (!db) return interaction.editReply({ content: 'Błąd bazy danych.' });
+                if (!db) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Błąd bazy danych.' });
 
                 const imieNazwisko = interaction.fields.getTextInputValue('admin_ed_imie').trim();
                 const dataUrodzenia = interaction.fields.getTextInputValue('admin_ed_data').trim();
@@ -755,7 +890,7 @@ module.exports = {
                 const nickRoblox = interaction.fields.getTextInputValue('admin_ed_roblox').trim();
 
                 const dowod = await db.collection('dowody').findOne({ userId });
-                if (!dowod) return interaction.editReply({ content: 'Nie znaleziono dowodu.' });
+                if (!dowod) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie znaleziono dowodu.' });
 
                 await db.collection('dowody').updateOne({ userId }, {
                     $set: { imieNazwisko, dataUrodzenia, miejsceUrodzenia, plec, nickRoblox, updatedAt: new Date() }
@@ -817,10 +952,10 @@ module.exports = {
             if (interaction.customId.startsWith('admin_zrob_edycja_')) {
                 const userId = interaction.customId.replace('admin_zrob_edycja_', '');
                 const db = getDb();
-                if (!db) return interaction.reply({ content: 'Błąd bazy.', ephemeral: true });
+                if (!db) return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Błąd bazy.', ephemeral: true });
 
                 const dowod = await db.collection('dowody').findOne({ userId });
-                if (!dowod) return interaction.reply({ content: 'Nie znaleziono dowodu.', ephemeral: true });
+                if (!dowod) return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie znaleziono dowodu.', ephemeral: true });
 
                 const modal = new ModalBuilder().setCustomId(`modal_admin_edytuj_zapisz_${userId}`).setTitle('Edycja Dowodu (Admin)');
                 modal.addComponents(
