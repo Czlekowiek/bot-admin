@@ -1,4 +1,69 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { getDb } = require('../index');
+
+async function getActivityData(messageId) {
+    const db = getDb();
+    if (!db) return null;
+    return await db.collection('activity_checks').findOne({ messageId });
+}
+
+async function saveActivityData(messageId, usersList, locked) {
+    const db = getDb();
+    if (!db) return;
+    await db.collection('activity_checks').updateOne(
+        { messageId },
+        { $set: { usersList, locked, updatedAt: new Date() } },
+        { upsert: true }
+    );
+}
+
+async function getOrInitUsersList(reaction) {
+    const msgId = reaction.message.id;
+    const dbData = await getActivityData(msgId);
+
+    if (dbData) {
+        return { usersList: dbData.usersList, locked: dbData.locked };
+    }
+
+    // Awaryjne pobranie z Discorda, jeśli brak w bazie
+    const usersMap = await reaction.users.fetch({ limit: 100 });
+    const usersList = [];
+    for (const [userId, user] of usersMap) {
+        if (!user.bot) {
+            usersList.push(userId);
+        }
+    }
+    const locked = usersList.length >= 3;
+    await saveActivityData(msgId, usersList, locked);
+    return { usersList, locked };
+}
+
+async function updateActivityBoard(message, usersList) {
+    if (!message.embeds.length) return;
+
+    const embed = message.embeds[0];
+    const description = embed.description || '';
+    const opisMatch = description.split(/### <:arrow:1543977081233342494> Opis: /);
+    const activityDescription = opisMatch[1] ? opisMatch[1] : null;
+
+    const top1 = usersList[0] ? `<@${usersList[0]}>` : 'Brak';
+    const top2 = usersList[1] ? `<@${usersList[1]}>` : 'Brak';
+    const top3 = usersList[2] ? `<@${usersList[2]}>` : 'Brak';
+
+    let newDescription =
+        `# <a:checkmark:1543969158646206475> Aktywność check\n` +
+        `## <a:top1:1548673656761352304> ${top1}\n` +
+        `## <a:top2:1548673747983011891> ${top2}\n` +
+        `## <a:top3:1548673801104138322> ${top3}\n\n` +
+        `## <a:dot:1543969325155745812> Zareaguj emotką "<a:checkmark:1543969158646206475>" poniżej aby zaznaczyć aktywność.`;
+
+    if (activityDescription) {
+        newDescription += `\n\n### <:arrow:1543977081233342494> Opis: ${activityDescription}`;
+    }
+
+    const updatedEmbed = EmbedBuilder.from(embed).setDescription(newDescription);
+    await message.edit({ embeds: [updatedEmbed] });
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -16,7 +81,10 @@ module.exports = {
 
         const channel = await interaction.guild.channels.fetch(channelId).catch(() => null);
         if (!channel) {
-            return interaction.reply({ content: '<a:redtick:1543991522192527450> Nie znaleziono kanału aktywności', ephemeral: true });
+            return interaction.reply({ 
+                content: '# <a:dot:1543969325155745812> Błąd\n<:arrow:1543977081233342494> Nie znaleziono kanału aktywności.', 
+                ephemeral: true 
+            });
         }
 
         const now = new Date();
@@ -48,13 +116,57 @@ module.exports = {
 
         await sentMessage.react('1543969158646206475');
 
-        // Logowanie użycia komendy aktywności
-        try {
-            if (interaction.client && typeof interaction.client.sendLog === 'function') {
-                await interaction.client.sendLog(`<a:neon_staff:1550909470605844650> Administrator **${interaction.user.tag}** utworzył wiadomość sprawdzającą aktywność na kanale <#${channelId}>.`);
-            }
-        } catch (e) {}
+        // Inicjalizacja pustej listy w bazie danych dla nowej wiadomości
+        await saveActivityData(sentMessage.id, [], false);
 
-        return interaction.reply({ content: '<a:greentick:1543991524738465853> Utworzono wiadomość aktywności na kanale https://discord.com/channels/1542121318286233683/1542122742768210000', ephemeral: true });
+        return interaction.reply({ 
+            content: '# <a:dot:1543969325155745812> Sukces\n<:arrow:1543977081233342494> Utworzono wiadomość aktywności na kanale <#${channelId}>.', 
+            ephemeral: true 
+        });
+    },
+
+    setupEvents(client) {
+        async function handleReactionChange(reaction, user, isAdd) {
+            if (user.bot) return;
+            if (reaction.partial) {
+                try { await reaction.fetch(); } catch { return; }
+            }
+            if (reaction.message.partial) {
+                try { await reaction.message.fetch(); } catch { return; }
+            }
+            if (reaction.emoji.id !== '1543969158646206475') return;
+
+            const message = reaction.message;
+            let { usersList, locked } = await getOrInitUsersList(reaction);
+
+            if (locked) return; // Jeśli top 3 jest pełne i zablokowane, ignorujemy zmiany
+
+            const index = usersList.indexOf(user.id);
+            if (isAdd) {
+                if (index === -1) {
+                    usersList.push(user.id);
+                }
+            } else {
+                if (index > -1) {
+                    usersList.splice(index, 1);
+                }
+            }
+
+            // Sprawdzamy czy osiągnięto pełną tabelkę (3 osoby)
+            if (usersList.length >= 3) {
+                locked = true;
+            }
+
+            await saveActivityData(message.id, usersList, locked);
+            await updateActivityBoard(message, usersList);
+        }
+
+        client.on('messageReactionAdd', async (reaction, user) => {
+            await handleReactionChange(reaction, user, true);
+        });
+
+        client.on('messageReactionRemove', async (reaction, user) => {
+            await handleReactionChange(reaction, user, false);
+        });
     }
 };
