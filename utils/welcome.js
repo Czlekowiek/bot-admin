@@ -6,7 +6,6 @@ async function sendWelcomeMessage(member) {
         const channel = await member.guild.channels.fetch('1542121319263641682').catch(() => null);
         if (!channel) return;
 
-        // Wczytanie tła (lub awaryjne szare tło, gdyby link nie zadziałał)
         let background;
         try {
             background = await Jimp.read('https://i.imgur.com/jYhAJz6.png');
@@ -15,19 +14,16 @@ async function sendWelcomeMessage(member) {
         }
         background.resize(700, 250);
 
-        // Wczytanie awatara użytkownika
         const avatarURL = member.user.displayAvatarURL({ extension: 'png', size: 256 });
         const avatar = await Jimp.read(avatarURL);
         avatar.resize(120, 120);
 
-        // Załadowanie wbudowanych czcionek Jimp
-        const font = await Jimp.loadFont(Jimp.FONT_SANS_32_WHITE);
-        const smallFont = await Jimp.loadFont(Jimp.FONT_SANS_16_GRAY);
+        // Zabezpieczone ładowanie czcionek z fallbackiem ścieżki
+        const font = await Jimp.loadFont(Jimp.FONT_SANS_32_WHITE || './node_modules/jimp/fonts/open-sans/open-sans-32-white/open-sans-32-white.fnt');
+        const smallFont = await Jimp.loadFont(Jimp.FONT_SANS_16_GRAY || './node_modules/jimp/fonts/open-sans/open-sans-16-gray/open-sans-16-gray.fnt');
 
-        // Nałożenie awatara na pozycję x: 50, y: 65
         background.composite(avatar, 50, 65);
 
-        // Teksty
         const title = `Witaj, ${member.user.username}!`;
         const subtitle = `Jesteś naszym ${member.guild.memberCount} użytkownikiem.`;
 
