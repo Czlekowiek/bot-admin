@@ -15,6 +15,7 @@ const { getDb } = require('../utils/database');
 
 const LOG_CHANNEL_ID = '1558460592648618155';
 const DOWODY_CHANNEL_ID = '1558466596295417996';
+const ADMIN_ROLE_ID = '1558536347042713661';
 
 const localWnioskiCache = new Map();
 
@@ -27,6 +28,11 @@ setInterval(() => {
         }
     }
 }, 60 * 60 * 1000);
+
+function hasAdminPermission(member) {
+    if (!member) return false;
+    return member.permissions.has(PermissionFlagsBits.Administrator) || member.roles.cache.has(ADMIN_ROLE_ID);
+}
 
 async function sendLog(client, content) {
     try {
@@ -126,7 +132,7 @@ module.exports = {
 
     async execute(interaction) {
         try {
-            if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+            if (!hasAdminPermission(interaction.member)) {
                 return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Ta komenda jest dostępna tylko dla administratorów.', ephemeral: true });
             }
 
@@ -358,7 +364,7 @@ module.exports = {
             }
 
             if (customId === 'admin_dowod_szukaj') {
-                if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
+                if (!hasAdminPermission(interaction.member)) {
                     return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Brak uprawnień.', ephemeral: true });
                 }
                 const modal = new ModalBuilder().setCustomId('modal_admin_szukaj').setTitle('Znajdź Dowód Użytkownika');
@@ -395,11 +401,10 @@ module.exports = {
                     .setPlaceholder(`Lista dowodów — strona ${currentPage + 1} z ${totalPages}`);
 
                 pageItems.forEach(d => {
-                    const rawName = getCleanRobloxName(d);
                     selectMenu.addOptions(
                         new StringSelectMenuOptionBuilder()
                             .setLabel(`${d.imieNazwisko}`.slice(0, 100))
-                            .setDescription(`Roblox: ${rawName} | ID: ${d.userId}`.slice(0, 100))
+                            .setDescription(`Roblox: ${d.nickRoblox} | ID: ${d.userId}`.slice(0, 100))
                             .setValue(d.userId)
                     );
                 });
@@ -853,6 +858,9 @@ module.exports = {
 
             // 3. Admin: Szukanie dowodu
             if (interaction.customId === 'modal_admin_szukaj') {
+                if (!hasAdminPermission(interaction.member)) {
+                    return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Brak uprawnień.', ephemeral: true });
+                }
                 await interaction.deferReply({ ephemeral: true });
                 const fraza = interaction.fields.getTextInputValue('szukaj_fraza').trim().toLowerCase();
                 const db = getDb();
@@ -912,9 +920,11 @@ module.exports = {
                 });
             }
 
-            // 4. Admin: Ręczne utworzenie dowodu
-            // 5. Admin: Edycja bezpośrednia
+            // 4. Admin: Edycja bezpośrednia
             if (interaction.customId.startsWith('modal_admin_edytuj_zapisz_')) {
+                if (!hasAdminPermission(interaction.member)) {
+                    return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Brak uprawnień.', ephemeral: true });
+                }
                 await interaction.deferReply({ ephemeral: true });
                 const userId = interaction.customId.replace('modal_admin_edytuj_zapisz_', '');
                 const db = getDb();
@@ -971,6 +981,7 @@ module.exports = {
             if (!interaction.isButton()) return;
 
             if (interaction.customId.startsWith('admin_zrob_usun_')) {
+                if (!hasAdminPermission(interaction.member)) return;
                 await interaction.deferReply({ ephemeral: true });
                 const userId = interaction.customId.replace('admin_zrob_usun_', '');
                 const db = getDb();
@@ -993,6 +1004,7 @@ module.exports = {
             }
 
             if (interaction.customId.startsWith('admin_zrob_edycja_')) {
+                if (!hasAdminPermission(interaction.member)) return;
                 const userId = interaction.customId.replace('admin_zrob_edycja_', '');
                 const db = getDb();
                 if (!db) return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Błąd bazy.', ephemeral: true });
