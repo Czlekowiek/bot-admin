@@ -9,13 +9,16 @@ const {
     TextInputBuilder,
     TextInputStyle,
     StringSelectMenuBuilder,
-    StringSelectMenuOptionBuilder
+    StringSelectMenuOptionBuilder,
+    AttachmentBuilder
 } = require('discord.js');
+const { createCanvas, loadImage } = require('canvas');
 const { getDb } = require('../utils/database');
 
 const LOG_CHANNEL_ID = '1558460592648618155';
 const DOWODY_CHANNEL_ID = '1558466596295417996';
 const ADMIN_ROLE_ID = '1558536347042713661';
+const TEMPLATE_URL = 'https://i.imgur.com/2C1hl1s.png';
 
 const localWnioskiCache = new Map();
 
@@ -77,6 +80,15 @@ async function checkRobloxAccount(nickRoblox) {
     }
 }
 
+function parseImieNazwisko(pelneImie) {
+    if (!pelneImie) return { imie: 'Brak', nazwisko: 'Brak' };
+    const czesci = pelneImie.trim().split(/\s+/);
+    return {
+        imie: czesci[0] || 'Brak',
+        nazwisko: czesci[1] || 'Brak'
+    };
+}
+
 function parsePlec(text) {
     if (!text) return "Nieznana";
     const rawValue = text.trim().toUpperCase();
@@ -111,6 +123,49 @@ function getRobloxUrl(d) {
         if (match) return match[2];
     }
     return 'Brak';
+}
+
+/**
+ * Generowanie grafiki dowodu tożsamości na płótnie (Canvas)
+ */
+async function generateIdCard(userData) {
+    const { imie, nazwisko } = parseImieNazwisko(userData.imieNazwisko);
+    const background = await loadImage(TEMPLATE_URL);
+    
+    const canvas = createCanvas(background.width, background.height);
+    const ctx = canvas.getContext('2d');
+
+    // Rysowanie tła (szablonu z Imgura)
+    ctx.drawImage(background, 0, 0);
+
+    // Ogólne ustawienia tekstu
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#111111';
+
+    // 1. Nazwisko (X: 256, Y: 106)
+    ctx.font = 'bold 24px sans-serif';
+    ctx.fillText(nazwisko, 256, 106);
+
+    // 2. Imię (X: 256, Y: 164)
+    ctx.font = 'bold 24px sans-serif';
+    ctx.fillText(imie, 256, 164);
+
+    // 3. Data urodzenia (X: 492, Y: 218)
+    ctx.font = '22px sans-serif';
+    ctx.fillText(userData.dataUrodzenia, 492, 218);
+
+    // 4. Płeć (X: 492, Y: 281)
+    ctx.font = '22px sans-serif';
+    ctx.fillText(userData.plec, 492, 281);
+
+    // 5. Podpis - Linijka 1: Discord (X: 256, Y: 371)
+    ctx.font = '18px sans-serif';
+    ctx.fillText(userData.nickDiscord || 'Nieznany', 256, 371);
+
+    // Podpis - Linijka 2: Roblox (X: 256, Y: 396)
+    ctx.fillText(getCleanRobloxName(userData), 256, 396);
+
+    return new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'dowod_tozsamosci.png' });
 }
 
 function buildDowodDescription(d) {
@@ -286,7 +341,7 @@ module.exports = {
 
                 const modal = new ModalBuilder().setCustomId('modal_dowod_skladanie').setTitle('Wniosek o Dowód Tożsamości');
                 modal.addComponents(
-                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_imie').setLabel('Imię i Nazwisko').setStyle(TextInputStyle.Short).setRequired(true)),
+                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_imie').setLabel('Imię i Nazwisko (np. Jan Kowalski)').setPlaceholder('Wpisz dokładnie jedno imię i jedno nazwisko').setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_data').setLabel('Data urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_miejsce').setLabel('Miejsce urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_plec').setLabel('Płeć (M / K)').setStyle(TextInputStyle.Short).setMinLength(1).setMaxLength(1).setRequired(true)),
@@ -523,12 +578,21 @@ module.exports = {
                     const nickDiscord = wniosek ? wniosek.nickDiscord : "Nieznany";
                     const createdAt = wniosek ? wniosek.createdAt : new Date();
 
+                    // Walidacja dokładności formatu imienia i nazwiska przed akceptacją
+                    const sprawdzenieImienia = parseImieNazwisko(imieNazwisko);
+                    if (sprawdzenieImienia.imie === 'Brak' || sprawdzenieImienia.nazwisko === 'Brak') {
+                        return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Wniosek posiada niepoprawny format imienia i nazwiska (wymagane jedno imię i jedno nazwisko).' });
+                    }
+
                     const dowodObj = { userId: targetUserId, imieNazwisko, dataUrodzenia, miejsceUrodzenia, plec, rawRobloxName, nickRobloxUrl, nickDiscord, approvedAt: new Date() };
 
                     if (db) {
                         await db.collection('dowody').updateOne({ userId: targetUserId }, { $set: dowodObj }, { upsert: true });
                         await db.collection('wnioski_dowody').deleteOne({ messageId });
                     }
+
+                    // Generowanie graficznego dokumentu tożsamości
+                    const attachment = await generateIdCard(dowodObj);
 
                     const channelDowody = await interaction.client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
                     let sentDowodMsgId = null;
@@ -537,7 +601,11 @@ module.exports = {
                             .setColor(0x2b2d31)
                             .setDescription(buildDowodDescription(dowodObj));
 
-                        const sentDMsg = await channelDowody.send({ content: `<@${targetUserId}>`, embeds: [embedDowod] });
+                        const sentDMsg = await channelDowody.send({ 
+                            content: `<@${targetUserId}>`, 
+                            embeds: [embedDowod],
+                            files: [attachment]
+                        });
                         sentDowodMsgId = sentDMsg.id;
 
                         if (db) await db.collection('dowody').updateOne({ userId: targetUserId }, { $set: { messageId: sentDowodMsgId } });
@@ -556,7 +624,7 @@ module.exports = {
                     }
 
                     await sendDm(interaction.client, targetUserId, '# <a:checkmark:1543969158646206475> Wniosek zaakceptowany\n<:arrow:1543977081233342494> Twój wniosek o dowód tożsamości został zatwierdzony przez administrację!');
-                    await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Pomyślnie zaakceptowano wniosek o dowód.' });
+                    await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Pomyślnie zaakceptowano wniosek o dowód i wygenerowano dokument graficzny.' });
 
                 } else if (subAction === 'usun') {
                     const stareDane = wniosek ? wniosek.stareDane : null;
@@ -610,6 +678,7 @@ module.exports = {
                     }
 
                     const fullUpdatedDowod = { userId: targetUserId, ...updateObj, nickDiscord: stareDane.nickDiscord };
+                    const attachment = await generateIdCard(fullUpdatedDowod);
 
                     if (stareDane && stareDane.messageId) {
                         const channelDowody = await interaction.client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
@@ -620,7 +689,7 @@ module.exports = {
                                     .setColor(0x2b2d31)
                                     .setDescription(buildDowodDescription(fullUpdatedDowod))
                                     .setFooter({ text: `Dane dowodu zostały edytowane (${formatDate(new Date())})` });
-                                await msg.edit({ content: `<@${targetUserId}>`, embeds: [newEmbed] }).catch(() => {});
+                                await msg.edit({ content: `<@${targetUserId}>`, embeds: [newEmbed], files: [attachment] }).catch(() => {});
                             }
                         }
                     }
@@ -725,6 +794,13 @@ module.exports = {
             if (interaction.customId === 'modal_dowod_skladanie') {
                 await interaction.deferReply({ ephemeral: true });
                 const imieNazwisko = interaction.fields.getTextInputValue('dowod_imie').trim();
+                
+                // Walidacja formatu: dokładnie jedno imię i jedno nazwisko
+                const sprawdzenie = parseImieNazwisko(imieNazwisko);
+                if (sprawdzenie.imie === 'Brak' || sprawdzenie.nazwisko === 'Brak') {
+                    return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Wpisz dokładnie **jedno imię i jedno nazwisko** oddzielone spacją (np. *Jan Kowalski*).' });
+                }
+
                 const dataUrodzenia = interaction.fields.getTextInputValue('dowod_data').trim();
                 const miejsceUrodzenia = interaction.fields.getTextInputValue('dowod_miejsce').trim();
                 const rawPlec = interaction.fields.getTextInputValue('dowod_plec').trim();
@@ -790,6 +866,12 @@ module.exports = {
                 const stareDane = await db.collection('dowody').findOne({ userId: interaction.user.id });
                 if (!stareDane) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie znaleziono dowodu.' });
 
+                const imieNazwisko = interaction.fields.getTextInputValue('dowod_imie').trim();
+                const sprawdzenie = parseImieNazwisko(imieNazwisko);
+                if (sprawdzenie.imie === 'Brak' || sprawdzenie.nazwisko === 'Brak') {
+                    return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Wpisz dokładnie **jedno imię i jedno nazwisko** oddzielone spacją.' });
+                }
+
                 const rawNickRoblox = interaction.fields.getTextInputValue('dowod_roblox').trim();
                 const robloxCheck = await checkRobloxAccount(rawNickRoblox);
                 if (!robloxCheck) {
@@ -797,7 +879,7 @@ module.exports = {
                 }
 
                 const noweDane = {
-                    imieNazwisko: interaction.fields.getTextInputValue('dowod_imie').trim(),
+                    imieNazwisko,
                     dataUrodzenia: interaction.fields.getTextInputValue('dowod_data').trim(),
                     miejsceUrodzenia: interaction.fields.getTextInputValue('dowod_miejsce').trim(),
                     plec: parsePlec(interaction.fields.getTextInputValue('dowod_plec').trim()),
@@ -909,6 +991,11 @@ module.exports = {
                 if (!db) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Błąd bazy danych.' });
 
                 const imieNazwisko = interaction.fields.getTextInputValue('admin_ed_imie').trim();
+                const sprawdzenie = parseImieNazwisko(imieNazwisko);
+                if (sprawdzenie.imie === 'Brak' || sprawdzenie.nazwisko === 'Brak') {
+                    return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Wpisz dokładnie **jedno imię i jedno nazwisko** oddzielone spacją.' });
+                }
+
                 const dataUrodzenia = interaction.fields.getTextInputValue('admin_ed_data').trim();
                 const miejsceUrodzenia = interaction.fields.getTextInputValue('admin_ed_miejsce').trim();
                 const plec = parsePlec(interaction.fields.getTextInputValue('admin_ed_plec').trim());
@@ -928,6 +1015,7 @@ module.exports = {
                 await db.collection('dowody').updateOne({ userId }, { $set: updatedFields });
 
                 const fullUpdatedDowod = { ...dowod, ...updatedFields };
+                const attachment = await generateIdCard(fullUpdatedDowod);
 
                 if (dowod.messageId) {
                     const channelDowody = await interaction.client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
@@ -938,7 +1026,7 @@ module.exports = {
                                 .setColor(0x2b2d31)
                                 .setDescription(buildDowodDescription(fullUpdatedDowod))
                                 .setFooter({ text: `Dane dowodu zostały edytowane przez administratora (${formatDate(new Date())})` });
-                            await msg.edit({ content: `<@${userId}>`, embeds: [newEmbed] }).catch(() => {});
+                            await msg.edit({ content: `<@${userId}>`, embeds: [newEmbed], files: [attachment] }).catch(() => {});
                         }
                     }
                 }
