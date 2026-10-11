@@ -9,20 +9,17 @@ const {
     TextInputBuilder,
     TextInputStyle,
     StringSelectMenuBuilder,
-    StringSelectMenuOptionBuilder,
-    AttachmentBuilder
+    StringSelectMenuOptionBuilder
 } = require('discord.js');
-const { createCanvas, loadImage } = require('canvas');
 const { getDb } = require('../utils/database');
 
 const LOG_CHANNEL_ID = '1558460592648618155';
 const DOWODY_CHANNEL_ID = '1558466596295417996';
 const ADMIN_ROLE_ID = '1558536347042713661';
-const TEMPLATE_URL = 'https://i.imgur.com/2C1hl1s.png';
 
 const localWnioskiCache = new Map();
 
-// Automatyczne czyszczenie cache starszego niż 1 godzina
+// Automatyczne czyszczenie cache starszego niż 1 godzina[cite: 3]
 setInterval(() => {
     const godzinaTemu = Date.now() - 60 * 60 * 1000;
     for (const [key, val] of localWnioskiCache.entries()) {
@@ -123,49 +120,6 @@ function getRobloxUrl(d) {
         if (match) return match[2];
     }
     return 'Brak';
-}
-
-/**
- * Generowanie grafiki dowodu tożsamości na płótnie (Canvas) z powiększonym, pogrubionym tekstem
- */
-async function generateIdCard(userData) {
-    const { imie, nazwisko } = parseImieNazwisko(userData.imieNazwisko);
-    const background = await loadImage(TEMPLATE_URL);
-    
-    const canvas = createCanvas(background.width, background.height);
-    const ctx = canvas.getContext('2d');
-
-    // Rysowanie tła (szablonu z Imgura)
-    ctx.drawImage(background, 0, 0);
-
-    // Ogólne ustawienia tekstu
-    ctx.textBaseline = 'top';
-    ctx.fillStyle = '#111111';
-
-    // 1. Nazwisko (X: 256, Y: 104) - Pogrubione, większa czcionka
-    ctx.font = 'bold 32px sans-serif';
-    ctx.fillText(nazwisko, 256, 104);
-
-    // 2. Imię (X: 256, Y: 160) - Pogrubione, większa czcionka
-    ctx.font = 'bold 32px sans-serif';
-    ctx.fillText(imie, 256, 160);
-
-    // 3. Data urodzenia (X: 492, Y: 216) - Pogrubiona, większa czcionka
-    ctx.font = 'bold 28px sans-serif';
-    ctx.fillText(userData.dataUrodzenia, 492, 216);
-
-    // 4. Płeć (X: 492, Y: 278) - Pogrubiona, większa czcionka
-    ctx.font = 'bold 28px sans-serif';
-    ctx.fillText(userData.plec, 492, 278);
-
-    // 5. Podpis - Linijka 1: Discord (X: 256, Y: 366) - Pogrubiony
-    ctx.font = 'bold 22px sans-serif';
-    ctx.fillText(userData.nickDiscord || 'Nieznany', 256, 366);
-
-    // Podpis - Linijka 2: Roblox (X: 256, Y: 394) - Pogrubiony
-    ctx.fillText(getCleanRobloxName(userData), 256, 394);
-
-    return new AttachmentBuilder(canvas.toBuffer('image/png'), { name: 'dowod_tozsamosci.png' });
 }
 
 function buildDowodDescription(d) {
@@ -361,13 +315,11 @@ module.exports = {
                     return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie posiadasz zatwierdzonego dowodu.' });
                 }
 
-                const attachment = await generateIdCard(dowod);
                 const embed = new EmbedBuilder()
                     .setColor(0x2b2d31)
-                    .setDescription(buildDowodDescription(dowod))
-                    .setImage('attachment://dowod_tozsamosci.png');
+                    .setDescription(buildDowodDescription(dowod));
 
-                await interaction.editReply({ embeds: [embed], files: [attachment] });
+                await interaction.editReply({ embeds: [embed] });
                 return true;
             }
 
@@ -425,18 +377,16 @@ module.exports = {
                 };
                 await db.collection('wnioski_dowody').insertOne({ messageId: uniqueId, dane: payload });
 
-                const attachment = await generateIdCard(dowod);
                 const embed = new EmbedBuilder()
                     .setColor(0xed4245)
-                    .setDescription(buildDowodDescription(dowod))
-                    .setImage('attachment://dowod_tozsamosci.png');
+                    .setDescription(buildDowodDescription(dowod));
 
                 const row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId(`dowod_akceptuj_usun_${interaction.user.id}_${uniqueId}`).setLabel('Zaakceptuj').setStyle(ButtonStyle.Success).setEmoji('1543991524738465853'),
                     new ButtonBuilder().setCustomId(`dowod_odrzuc_usun_${interaction.user.id}_${uniqueId}`).setLabel('Odrzuć').setStyle(ButtonStyle.Danger).setEmoji('1543991522192527450')
                 );
 
-                const sentMsg = await channel.send({ embeds: [embed], files: [attachment], components: [row] });
+                const sentMsg = await channel.send({ embeds: [embed], components: [row] });
                 payload.messageId = sentMsg.id;
                 await db.collection('wnioski_dowody').updateOne({ messageId: uniqueId }, { $set: { messageId: sentMsg.id } }, { upsert: true });
 
@@ -594,20 +544,16 @@ module.exports = {
                         await db.collection('wnioski_dowody').deleteOne({ messageId });
                     }
 
-                    const attachment = await generateIdCard(dowodObj);
-
                     const channelDowody = await interaction.client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
                     let sentDowodMsgId = null;
                     if (channelDowody) {
                         const embedDowod = new EmbedBuilder()
                             .setColor(0x2b2d31)
-                            .setDescription(buildDowodDescription(dowodObj))
-                            .setImage('attachment://dowod_tozsamosci.png');
+                            .setDescription(buildDowodDescription(dowodObj));
 
                         const sentDMsg = await channelDowody.send({ 
                             content: `<@${targetUserId}>`, 
-                            embeds: [embedDowod],
-                            files: [attachment]
+                            embeds: [embedDowod]
                         });
                         sentDowodMsgId = sentDMsg.id;
 
@@ -618,18 +564,16 @@ module.exports = {
                         const origEmbed = EmbedBuilder.from(interaction.message.embeds[0])
                             .setColor(0x57f287)
                             .setTitle('🪪 Wniosek o Dowód - ZAAKCEPTOWANY')
-                            .setImage('attachment://dowod_tozsamosci.png')
                             .addFields(
                                 { name: 'Data prośby', value: formatDate(createdAt), inline: true },
                                 { name: 'Data zaakceptowania', value: formatDate(new Date()), inline: true },
                                 { name: 'Zaakceptował', value: interaction.user.tag, inline: true }
                             );
-                        const logAttachment = await generateIdCard(dowodObj);
-                        await interaction.message.edit({ embeds: [origEmbed], files: [logAttachment], components: [] }).catch(() => {});
+                        await interaction.message.edit({ embeds: [origEmbed], components: [] }).catch(() => {});
                     }
 
                     await sendDm(interaction.client, targetUserId, '# <a:checkmark:1543969158646206475> Wniosek zaakceptowany\n<:arrow:1543977081233342494> Twój wniosek o dowód tożsamości został zatwierdzony przez administrację!');
-                    await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Pomyślnie zaakceptowano wniosek o dowód i wygenerowano dokument graficzny.' });
+                    await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Pomyślnie zaakceptowano wniosek o dowód.' });
 
                 } else if (subAction === 'usun') {
                     const stareDane = wniosek ? wniosek.stareDane : null;
@@ -683,7 +627,6 @@ module.exports = {
                     }
 
                     const fullUpdatedDowod = { userId: targetUserId, ...updateObj, nickDiscord: stareDane.nickDiscord };
-                    const attachment = await generateIdCard(fullUpdatedDowod);
 
                     if (stareDane && stareDane.messageId) {
                         const channelDowody = await interaction.client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
@@ -693,9 +636,8 @@ module.exports = {
                                 const newEmbed = new EmbedBuilder()
                                     .setColor(0x2b2d31)
                                     .setDescription(buildDowodDescription(fullUpdatedDowod))
-                                    .setImage('attachment://dowod_tozsamosci.png')
                                     .setFooter({ text: `Dane dowodu zostały edytowane (${formatDate(new Date())})` });
-                                await msg.edit({ content: `<@${targetUserId}>`, embeds: [newEmbed], files: [attachment] }).catch(() => {});
+                                await msg.edit({ content: `<@${targetUserId}>`, embeds: [newEmbed] }).catch(() => {});
                             }
                         }
                     }
@@ -703,20 +645,18 @@ module.exports = {
                     const oldEmbed = new EmbedBuilder()
                         .setColor(0x000000)
                         .setDescription(buildDowodDescription(stareDane))
-                        .setImage('attachment://dowod_tozsamosci.png')
                         .setFooter({ text: 'Dowód przed edycją' });
 
                     const newEmbedLog = new EmbedBuilder()
                         .setColor(0x57f287)
                         .setDescription(buildDowodDescription(fullUpdatedDowod))
-                        .setImage('attachment://dowod_tozsamosci.png')
                         .addFields(
                             { name: 'Data prośby', value: formatDate(createdAt), inline: true },
                             { name: 'Data zaakceptowania', value: formatDate(new Date()), inline: true },
                             { name: 'Zaakceptował', value: interaction.user.tag, inline: true }
                         );
 
-                    await interaction.message.edit({ embeds: [oldEmbed, newEmbedLog], files: [attachment], components: [] }).catch(() => {});
+                    await interaction.message.edit({ embeds: [oldEmbed, newEmbedLog], components: [] }).catch(() => {});
                     await sendDm(interaction.client, targetUserId, '# <a:checkmark:1543969158646206475> Edycja zatwierdzona\n<:arrow:1543977081233342494> Twoja prośba o edycję danych dowodu została zaakceptowana.');
                     await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Zatwierdzono edycję dowodu.' });
                 }
@@ -747,18 +687,16 @@ module.exports = {
                 const wynik = await db.collection('dowody').findOne({ userId: targetUserId });
                 if (!wynik) return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie znaleziono wybranego dowodu.' });
 
-                const attachment = await generateIdCard(wynik);
                 const embed = new EmbedBuilder()
                     .setColor(0x2b2d31)
-                    .setDescription(buildDowodDescription(wynik))
-                    .setImage('attachment://dowod_tozsamosci.png');
+                    .setDescription(buildDowodDescription(wynik));
 
                 const row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId(`admin_zrob_edycja_${wynik.userId}`).setLabel('Edytuj jako Admin').setStyle(ButtonStyle.Success).setEmoji('✏️'),
                     new ButtonBuilder().setCustomId(`admin_zrob_usun_${wynik.userId}`).setLabel('Usuń jako Admin').setStyle(ButtonStyle.Danger).setEmoji('🗑️')
                 );
 
-                await interaction.editReply({ embeds: [embed], files: [attachment], components: [row] });
+                await interaction.editReply({ embeds: [embed], components: [row] });
                 return;
             }
 
@@ -841,18 +779,16 @@ module.exports = {
                 if (db) await db.collection('wnioski_dowody').insertOne({ messageId: uniqueId, dane: payload });
                 localWnioskiCache.set(uniqueId, payload);
 
-                const attachment = await generateIdCard(payload);
                 const embed = new EmbedBuilder()
                     .setColor(0x3498db)
-                    .setDescription(buildDowodDescription(payload))
-                    .setImage('attachment://dowod_tozsamosci.png');
+                    .setDescription(buildDowodDescription(payload));
 
                 const row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId(`dowod_akceptuj_stworz_${interaction.user.id}_${uniqueId}`).setLabel('Zaakceptuj').setStyle(ButtonStyle.Success).setEmoji('1543991524738465853'),
                     new ButtonBuilder().setCustomId(`dowod_odrzuc_stworz_${interaction.user.id}_${uniqueId}`).setLabel('Odrzuć').setStyle(ButtonStyle.Danger).setEmoji('1543991522192527450')
                 );
 
-                const sentMsg = await channel.send({ embeds: [embed], files: [attachment], components: [row] });
+                const sentMsg = await channel.send({ embeds: [embed], components: [row] });
                 if (db) {
                     await db.collection('wnioski_dowody').deleteOne({ messageId: uniqueId });
                     payload.messageId = sentMsg.id;
@@ -912,18 +848,16 @@ module.exports = {
                 };
                 await db.collection('wnioski_dowody').insertOne({ messageId: uniqueId, dane: payload });
 
-                const attachment = await generateIdCard({ userId: interaction.user.id, ...noweDane });
                 const embed = new EmbedBuilder()
                     .setColor(0x3498db)
-                    .setDescription(buildDowodDescription({ userId: interaction.user.id, ...noweDane }))
-                    .setImage('attachment://dowod_tozsamosci.png');
+                    .setDescription(buildDowodDescription({ userId: interaction.user.id, ...noweDane }));
 
                 const row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId(`dowod_akceptuj_edycja_${interaction.user.id}_${uniqueId}`).setLabel('Zaakceptuj').setStyle(ButtonStyle.Success).setEmoji('1543991524738465853'),
                     new ButtonBuilder().setCustomId(`dowod_odrzuc_edycja_${interaction.user.id}_${uniqueId}`).setLabel('Odrzuć').setStyle(ButtonStyle.Danger).setEmoji('1543991522192527450')
                 );
 
-                const sentMsg = await channel.send({ embeds: [embed], files: [attachment], components: [row] });
+                const sentMsg = await channel.send({ embeds: [embed], components: [row] });
                 payload.messageId = sentMsg.id;
                 await db.collection('wnioski_dowody').updateOne({ messageId: uniqueId }, { $set: { messageId: sentMsg.id } }, { upsert: true });
 
@@ -960,18 +894,16 @@ module.exports = {
 
                 if (wyniki.length === 1) {
                     const wynik = wyniki[0];
-                    const attachment = await generateIdCard(wynik);
                     const embed = new EmbedBuilder()
                         .setColor(0x2b2d31)
-                        .setDescription(buildDowodDescription(wynik))
-                        .setImage('attachment://dowod_tozsamosci.png');
+                        .setDescription(buildDowodDescription(wynik));
 
                     const row = new ActionRowBuilder().addComponents(
                         new ButtonBuilder().setCustomId(`admin_zrob_edycja_${wynik.userId}`).setLabel('Edytuj jako Admin').setStyle(ButtonStyle.Success).setEmoji('✏️'),
                         new ButtonBuilder().setCustomId(`admin_zrob_usun_${wynik.userId}`).setLabel('Usuń jako Admin').setStyle(ButtonStyle.Danger).setEmoji('🗑️')
                     );
 
-                    await interaction.editReply({ embeds: [embed], files: [attachment], components: [row] });
+                    await interaction.editReply({ embeds: [embed], components: [row] });
                     return;
                 }
 
@@ -1030,7 +962,6 @@ module.exports = {
                 await db.collection('dowody').updateOne({ userId }, { $set: updatedFields });
 
                 const fullUpdatedDowod = { ...dowod, ...updatedFields };
-                const attachment = await generateIdCard(fullUpdatedDowod);
 
                 if (dowod.messageId) {
                     const channelDowody = await interaction.client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
@@ -1040,9 +971,8 @@ module.exports = {
                             const newEmbed = new EmbedBuilder()
                                 .setColor(0x2b2d31)
                                 .setDescription(buildDowodDescription(fullUpdatedDowod))
-                                .setImage('attachment://dowod_tozsamosci.png')
                                 .setFooter({ text: `Dane dowodu zostały edytowane przez administratora (${formatDate(new Date())})` });
-                            await msg.edit({ content: `<@${userId}>`, embeds: [newEmbed], files: [attachment] }).catch(() => {});
+                            await msg.edit({ content: `<@${userId}>`, embeds: [newEmbed] }).catch(() => {});
                         }
                     }
                 }
