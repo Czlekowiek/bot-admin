@@ -155,7 +155,7 @@ module.exports = {
 
                 const row = new ActionRowBuilder().addComponents(
                     new ButtonBuilder().setCustomId('admin_dowod_szukaj').setLabel('Znajdź dowód').setStyle(ButtonStyle.Primary).setEmoji('🔎'),
-                    new ButtonBuilder().setCustomId('admin_dowod_weryfikuj').setLabel('Ręczna weryfikacja').setStyle(ButtonStyle.Success).setEmoji('🛠️')
+                    new ButtonBuilder().setCustomId('admin_dowod_lista_0').setLabel('Lista dowodów').setStyle(ButtonStyle.Secondary).setEmoji('📋')
                 );
 
                 await interaction.reply({ embeds: [embed], components: [row] });
@@ -369,19 +369,75 @@ module.exports = {
                 return true;
             }
 
-            if (customId === 'admin_dowod_weryfikuj') {
-                if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
+            if (customId.startsWith('admin_dowod_lista_')) {
+                if (!hasAdminPermission(interaction.member)) {
                     return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Brak uprawnień.', ephemeral: true });
                 }
-                const modal = new ModalBuilder().setCustomId('modal_admin_weryfikuj').setTitle('Ręczne Utworzenie Dowodu');
-                modal.addComponents(
-                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('w_id').setLabel('ID Użytkownika Discord').setStyle(TextInputStyle.Short).setRequired(true)),
-                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('w_imie').setLabel('Imię i Nazwisko').setStyle(TextInputStyle.Short).setRequired(true)),
-                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('w_data').setLabel('Data urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
-                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('w_miejsce').setLabel('Miejsce urodzenia').setStyle(TextInputStyle.Short).setRequired(true)),
-                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('w_plec').setLabel('Płeć (M / K)').setStyle(TextInputStyle.Short).setMinLength(1).setMaxLength(1).setRequired(true))
-                );
-                await interaction.showModal(modal);
+
+                const page = parseInt(customId.replace('admin_dowod_lista_', '')) || 0;
+                const itemsPerPage = 25;
+
+                const db = getDb();
+                if (!db) return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Błąd bazy danych.', ephemeral: true });
+
+                const dowody = await db.collection('dowody').find({}).toArray();
+                if (!dowody || dowody.length === 0) {
+                    return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Brak dowodów w bazie danych.', ephemeral: true });
+                }
+
+                const totalPages = Math.ceil(dowody.length / itemsPerPage);
+                const currentPage = Math.min(page, totalPages - 1);
+                const start = currentPage * itemsPerPage;
+                const pageItems = dowody.slice(start, start + itemsPerPage);
+
+                const selectMenu = new StringSelectMenuBuilder()
+                    .setCustomId('select_admin_dowod')
+                    .setPlaceholder(`Lista dowodów — strona ${currentPage + 1} z ${totalPages}`);
+
+                pageItems.forEach(d => {
+                    const rawName = getCleanRobloxName(d);
+                    selectMenu.addOptions(
+                        new StringSelectMenuOptionBuilder()
+                            .setLabel(`${d.imieNazwisko}`.slice(0, 100))
+                            .setDescription(`Roblox: ${rawName} | ID: ${d.userId}`.slice(0, 100))
+                            .setValue(d.userId)
+                    );
+                });
+
+                const navButtons = [];
+                if (currentPage > 0) {
+                    navButtons.push(
+                        new ButtonBuilder()
+                            .setCustomId(`admin_dowod_lista_${currentPage - 1}`)
+                            .setLabel('◀️ Poprzednia')
+                            .setStyle(ButtonStyle.Secondary)
+                    );
+                }
+                if (currentPage < totalPages - 1) {
+                    navButtons.push(
+                        new ButtonBuilder()
+                            .setCustomId(`admin_dowod_lista_${currentPage + 1}`)
+                            .setLabel('Następna ▶️')
+                            .setStyle(ButtonStyle.Secondary)
+                    );
+                }
+
+                const components = [new ActionRowBuilder().addComponents(selectMenu)];
+                if (navButtons.length > 0) {
+                    components.push(new ActionRowBuilder().addComponents(...navButtons));
+                }
+
+                const replyPayload = {
+                    content: `# 📋 Lista dowodów (${dowody.length} łącznie) — strona ${currentPage + 1} z ${totalPages}\n<:arrow:1543977081233342494> Wybierz gracza z listy poniżej, aby wyświetlić i zarządzać jego dowodem.`,
+                    components,
+                    ephemeral: true
+                };
+
+                if (interaction.deferred || interaction.replied) {
+                    await interaction.editReply(replyPayload);
+                } else {
+                    await interaction.reply(replyPayload);
+                }
                 return true;
             }
 
@@ -857,87 +913,6 @@ module.exports = {
             }
 
             // 4. Admin: Ręczne utworzenie dowodu
-            if (interaction.customId === 'modal_admin_weryfikuj') {
-                await interaction.deferReply({ ephemeral: true });
-                const userId = interaction.fields.getTextInputValue('w_id').trim();
-
-                if (!/^\d{17,20}$/.test(userId)) {
-                    return interaction.editReply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Podane ID użytkownika jest nieprawidłowe. ID powinno składać się wyłącznie z cyfr (17–20 znaków).' });
-                }
-
-                const imieNazwisko = interaction.fields.getTextInputValue('w_imie').trim();
-                const dataUrodzenia = interaction.fields.getTextInputValue('w_data').trim();
-                const miejsceUrodzenia = interaction.fields.getTextInputValue('w_miejsce').trim();
-                const plec = parsePlec(interaction.fields.getTextInputValue('w_plec').trim());
-
-                let targetUserTag = "Nieznany";
-                try {
-                    const fetchedUser = await interaction.client.users.fetch(userId).catch(() => null);
-                    if (fetchedUser) targetUserTag = fetchedUser.tag;
-                } catch {}
-
-                const channelDowody = await interaction.client.channels.fetch(DOWODY_CHANNEL_ID).catch(() => null);
-                let sentDowodMsgId = null;
-
-                if (channelDowody) {
-                    const embedDowod = new EmbedBuilder()
-                        .setTitle(`🪪 Dowód Tożsamości - ${imieNazwisko}`)
-                        .setColor(0x2b2d31)
-                        .setDescription(
-                            `<:arrow:1543977081233342494> **Imię i Nazwisko:** ${imieNazwisko}\n` +
-                            `<:arrow:1543977081233342494> **Data urodzenia:** ${dataUrodzenia}\n` +
-                            `<:arrow:1543977081233342494> **Miejsce urodzenia:** ${miejsceUrodzenia}\n` +
-                            `<:arrow:1543977081233342494> **Płeć:** ${plec}\n` +
-                            `<:arrow:1543977081233342494> **Nick Roblox:** Brak\n` +
-                            `<:arrow:1543977081233342494> **Nick Discord:** ${targetUserTag}`
-                        );
-                    const sentDMsg = await channelDowody.send({ content: `<@${userId}>`, embeds: [embedDowod] });
-                    sentDowodMsgId = sentDMsg.id;
-                }
-
-                const db = getDb();
-                if (db) {
-                    await db.collection('dowody').updateOne(
-                        { userId },
-                        { 
-                            $set: { 
-                                imieNazwisko, 
-                                dataUrodzenia, 
-                                miejsceUrodzenia, 
-                                plec, 
-                                nickRoblox: 'Brak', 
-                                nickDiscord: targetUserTag, 
-                                verifiedAt: new Date(), 
-                                verifiedBy: interaction.user.tag,
-                                messageId: sentDowodMsgId
-                            } 
-                        },
-                        { upsert: true }
-                    );
-                }
-
-                const embedLog = new EmbedBuilder()
-                    .setTitle('🛠️ Ręczne Utworzenie Dowodu przez Admina')
-                    .setColor(0x57f287)
-                    .setDescription(
-                        `<:arrow:1543977081233342494> **Właściciel:** <@${userId}> (${targetUserTag})\n` +
-                        `<:arrow:1543977081233342494> **Imię i Nazwisko:** ${imieNazwisko}\n` +
-                        `<:arrow:1543977081233342494> **Data urodzenia:** ${dataUrodzenia}\n` +
-                        `<:arrow:1543977081233342494> **Miejsce urodzenia:** ${miejsceUrodzenia}\n` +
-                        `<:arrow:1543977081233342494> **Płeć:** ${plec}\n` +
-                        `<:arrow:1543977081233342494> **Administrator:** ${interaction.user.tag}\n` +
-                        `<:arrow:1543977081233342494> **Data:** ${formatDate(new Date())}`
-                    );
-
-                const logChannel = await interaction.client.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
-                if (logChannel) {
-                    await logChannel.send({ embeds: [embedLog] });
-                }
-
-                await sendDm(client, userId, '# <a:checkmark:1543969158646206475> Dowód utworzony\n<:arrow:1543977081233342494> Administrator utworzył dla Ciebie dowód tożsamości.');
-                await interaction.editReply({ content: '# <a:checkmark:1543969158646206475> Sukces\n<:arrow:1543977081233342494> Ręcznie utworzono dowód tożsamości i opublikowano go na kanale.' });
-            }
-
             // 5. Admin: Edycja bezpośrednia
             if (interaction.customId.startsWith('modal_admin_edytuj_zapisz_')) {
                 await interaction.deferReply({ ephemeral: true });
