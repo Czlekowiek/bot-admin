@@ -80,9 +80,34 @@ function formatDate(date) {
     return new Date(date).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'medium' });
 }
 
+// Funkcja obsługująca kompatybilność wsteczną dla starych wpisów w bazie
+function getRobloxData(d) {
+    let name = d.rawRobloxName;
+    let url = d.nickRobloxUrl;
+
+    if (!name && d.nickRoblox) {
+        if (d.nickRoblox.startsWith('[')) {
+            const match = d.nickRoblox.match(/\[(.*?)\]\((.*?)\)/);
+            if (match) {
+                name = match[1];
+                url = match[2];
+            } else {
+                name = d.nickRoblox;
+            }
+        } else {
+            name = d.nickRoblox;
+        }
+    }
+    return {
+        name: name || 'Brak',
+        url: url || 'Brak'
+    };
+}
+
 function buildDowodDescription(d) {
-    const robloxLinkFormatted = d.nickRobloxUrl && d.nickRobloxUrl !== 'Brak' 
-        ? `[Profil Roblox](${d.nickRobloxUrl})` 
+    const roblox = getRobloxData(d);
+    const robloxLinkFormatted = roblox.url && roblox.url !== 'Brak' 
+        ? `[Profil Roblox](${roblox.url})` 
         : 'Brak';
 
     return `# 🪪 Dowód tożsamości - <@${d.userId}>\n` +
@@ -90,7 +115,7 @@ function buildDowodDescription(d) {
            `<:arrow:1543977081233342494> **Data urodzenia:** ${d.dataUrodzenia}\n` +
            `<:arrow:1543977081233342494> **Miejsce urodzenia:** ${d.miejsceUrodzenia}\n` +
            `<:arrow:1543977081233342494> **Płeć:** ${d.plec}\n` +
-           `<:arrow:1543977081233342494> **Nick Roblox:** ${d.rawRobloxName || 'Brak'}\n` +
+           `<:arrow:1543977081233342494> **Nick Roblox:** ${roblox.name}\n` +
            `<:arrow:1543977081233342494> **Link Roblox:** ${robloxLinkFormatted}\n` +
            `<:arrow:1543977081233342494> **Nick Discord:** ${d.nickDiscord || 'Nieznany'}`;
 }
@@ -107,8 +132,9 @@ function generateListaEmbed(dowody, page, totalPages) {
 
     let desc = '';
     pageItems.forEach((d, idx) => {
-        const robloxLinkFormatted = d.nickRobloxUrl && d.nickRobloxUrl !== 'Brak' 
-            ? `[Profil Roblox](${d.nickRobloxUrl})` 
+        const roblox = getRobloxData(d);
+        const robloxLinkFormatted = roblox.url && roblox.url !== 'Brak' 
+            ? `[Profil Roblox](${roblox.url})` 
             : 'Brak';
 
         desc += `### ${start + idx + 1}. ${d.imieNazwisko}\n` +
@@ -116,7 +142,7 @@ function generateListaEmbed(dowody, page, totalPages) {
                 `<:arrow:1543977081233342494> **Data urodzenia:** ${d.dataUrodzenia}\n` +
                 `<:arrow:1543977081233342494> **Miejsce urodzenia:** ${d.miejsceUrodzenia}\n` +
                 `<:arrow:1543977081233342494> **Płeć:** ${d.plec}\n` +
-                `<:arrow:1543977081233342494> **Nick Roblox:** ${d.rawRobloxName || 'Brak'}\n` +
+                `<:arrow:1543977081233342494> **Nick Roblox:** ${roblox.name}\n` +
                 `<:arrow:1543977081233342494> **Link Roblox:** ${robloxLinkFormatted}\n` +
                 `<:arrow:1543977081233342494> **Nick Discord:** ${d.nickDiscord || 'Nieznany'}\n\n`;
     });
@@ -247,13 +273,14 @@ module.exports = {
                 const dowod = await db.collection('dowody').findOne({ userId });
                 if (!dowod) return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie znaleziono dowodu.', ephemeral: true });
 
+                const roblox = getRobloxData(dowod);
                 const modal = new ModalBuilder().setCustomId(`modal_admin_edytuj_zapisz_${userId}`).setTitle('Edycja Dowodu (Admin)');
                 modal.addComponents(
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('admin_ed_imie').setLabel('Imię i Nazwisko').setValue(dowod.imieNazwisko).setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('admin_ed_data').setLabel('Data urodzenia').setValue(dowod.dataUrodzenia).setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('admin_ed_miejsce').setLabel('Miejsce urodzenia').setValue(dowod.miejsceUrodzenia).setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('admin_ed_plec').setLabel('Płeć (Mężczyzna / Kobieta)').setValue(dowod.plec).setStyle(TextInputStyle.Short).setRequired(true)),
-                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('admin_ed_roblox').setLabel('Nick Roblox').setValue(dowod.rawRobloxName || '').setStyle(TextInputStyle.Short).setRequired(true))
+                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('admin_ed_roblox').setLabel('Nick Roblox').setValue(roblox.name).setStyle(TextInputStyle.Short).setRequired(true))
                 );
                 await interaction.showModal(modal);
                 return true;
@@ -333,13 +360,14 @@ module.exports = {
                     return interaction.reply({ content: '# <a:redtick:1543991522192527450> Błąd\n<:arrow:1543977081233342494> Nie posiadasz dowodu do edycji.', ephemeral: true });
                 }
 
+                const roblox = getRobloxData(dowod);
                 const modal = new ModalBuilder().setCustomId('modal_dowod_edycja').setTitle('Prośba o Edycję Dowodu');
                 modal.addComponents(
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_imie').setLabel('Imię i Nazwisko').setValue(dowod.imieNazwisko).setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_data').setLabel('Data urodzenia').setValue(dowod.dataUrodzenia).setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_miejsce').setLabel('Miejsce urodzenia').setValue(dowod.miejsceUrodzenia).setStyle(TextInputStyle.Short).setRequired(true)),
                     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_plec').setLabel('Płeć (M / K)').setValue(dowod.plec.startsWith('M') ? 'M' : 'K').setStyle(TextInputStyle.Short).setMinLength(1).setMaxLength(1).setRequired(true)),
-                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_roblox').setLabel('Nick Roblox').setValue(dowod.rawRobloxName || '').setStyle(TextInputStyle.Short).setRequired(true))
+                    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('dowod_roblox').setLabel('Nick Roblox').setValue(roblox.name).setStyle(TextInputStyle.Short).setRequired(true))
                 );
                 await interaction.showModal(modal);
                 return true;
@@ -367,8 +395,9 @@ module.exports = {
                 };
                 await db.collection('wnioski_dowody').insertOne({ messageId: uniqueId, dane: payload });
 
-                const robloxLinkFormatted = dowod.nickRobloxUrl && dowod.nickRobloxUrl !== 'Brak' 
-                    ? `[Profil Roblox](${dowod.nickRobloxUrl})` 
+                const roblox = getRobloxData(dowod);
+                const robloxLinkFormatted = roblox.url && roblox.url !== 'Brak' 
+                    ? `[Profil Roblox](${roblox.url})` 
                     : 'Brak';
 
                 const embed = new EmbedBuilder()
@@ -379,7 +408,7 @@ module.exports = {
                         `<:arrow:1543977081233342494> **Data urodzenia:** ${dowod.dataUrodzenia}\n` +
                         `<:arrow:1543977081233342494> **Miejsce urodzenia:** ${dowod.miejsceUrodzenia}\n` +
                         `<:arrow:1543977081233342494> **Płeć:** ${dowod.plec}\n` +
-                        `<:arrow:1543977081233342494> **Nick Roblox:** ${dowod.rawRobloxName || 'Brak'}\n` +
+                        `<:arrow:1543977081233342494> **Nick Roblox:** ${roblox.name}\n` +
                         `<:arrow:1543977081233342494> **Link Roblox:** ${robloxLinkFormatted}\n` +
                         `<:arrow:1543977081233342494> **Nick Discord:** ${dowod.nickDiscord || 'Nieznany'}`
                     );
@@ -587,7 +616,8 @@ module.exports = {
                         }
                     }
 
-                    const stareRobloxLink = stareDane.nickRobloxUrl && stareDane.nickRobloxUrl !== 'Brak' ? `[Profil Roblox](${stareDane.nickRobloxUrl})` : 'Brak';
+                    const stareRoblox = getRobloxData(stareDane);
+                    const stareRobloxLink = stareRoblox.url && stareRoblox.url !== 'Brak' ? `[Profil Roblox](${stareRoblox.url})` : 'Brak';
                     const noweRobloxLink = noweDane.nickRobloxUrl && noweDane.nickRobloxUrl !== 'Brak' ? `[Profil Roblox](${noweDane.nickRobloxUrl})` : 'Brak';
 
                     const oldEmbed = new EmbedBuilder()
@@ -598,7 +628,7 @@ module.exports = {
                             `<:arrow:1543977081233342494> **Data urodzenia:** ${stareDane.dataUrodzenia}\n` +
                             `<:arrow:1543977081233342494> **Miejsce urodzenia:** ${stareDane.miejsceUrodzenia}\n` +
                             `<:arrow:1543977081233342494> **Płeć:** ${stareDane.plec}\n` +
-                            `<:arrow:1543977081233342494> **Nick Roblox:** ${stareDane.rawRobloxName || 'Brak'}\n` +
+                            `<:arrow:1543977081233342494> **Nick Roblox:** ${stareRoblox.name}\n` +
                             `<:arrow:1543977081233342494> **Link Roblox:** ${stareRobloxLink}\n` +
                             `<:arrow:1543977081233342494> **Nick Discord:** ${stareDane.nickDiscord || 'Nieznany'}`
                         );
@@ -858,7 +888,8 @@ module.exports = {
 
                 const dowody = await db.collection('dowody').find({}).toArray();
                 const wyniki = dowody.filter(d => {
-                    const rawNick = (d.rawRobloxName || '').toLowerCase();
+                    const roblox = getRobloxData(d);
+                    const rawNick = roblox.name.toLowerCase();
                     return d.userId === fraza || 
                         (d.imieNazwisko || '').toLowerCase().includes(fraza) || 
                         rawNick.includes(fraza);
@@ -888,10 +919,11 @@ module.exports = {
                     .setPlaceholder('Wybierz dowód z listy...');
 
                 wyniki.slice(0, 25).forEach(d => {
+                    const roblox = getRobloxData(d);
                     selectMenu.addOptions(
                         new StringSelectMenuOptionBuilder()
                             .setLabel(`${d.imieNazwisko}`.slice(0, 100))
-                            .setDescription(`Roblox: ${d.rawRobloxName || 'Brak'} | ID: ${d.userId}`.slice(0, 100))
+                            .setDescription(`Roblox: ${roblox.name} | ID: ${d.userId}`.slice(0, 100))
                             .setValue(d.userId)
                     );
                 });
