@@ -48,7 +48,10 @@ async function sendDm(client, userId, content) {
 
 async function checkRobloxAccount(nickRoblox) {
     try {
-        const response = await fetch(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(nickRoblox)}`, {
+        if (!nickRoblox) return null;
+        const cleanQuery = nickRoblox.trim();
+
+        const response = await fetch(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(cleanQuery)}`, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
             }
@@ -57,7 +60,9 @@ async function checkRobloxAccount(nickRoblox) {
         const data = await response.json();
         if (!data.data || data.data.length === 0) return null;
         
-        const exactMatch = data.data.find(u => u.name.toLowerCase() === nickRoblox.toLowerCase());
+        // Szukamy wyłącznie dokładnego dopasowania nazwy użytkownika (case-insensitive) bez display name i bez fallbacków
+        const exactMatch = data.data.find(u => u.name.toLowerCase() === cleanQuery.toLowerCase());
+
         if (!exactMatch) return null;
 
         return {
